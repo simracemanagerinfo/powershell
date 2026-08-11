@@ -9,7 +9,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+    throw 'Questo install.ps1 configura Windows Terminal ed è attualmente supportato solo su Windows.'
+}
+
 $script:RuntimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+$script:AssetRoot = Join-Path $script:RuntimeRoot 'assets'
+$script:LauncherRoot = Join-Path $script:RuntimeRoot 'launchers'
 $script:FragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
 $script:OptionsPath = Join-Path $script:RuntimeRoot 'install-options.json'
 $script:BinRoot = Join-Path $script:RuntimeRoot 'bin'
@@ -35,14 +42,10 @@ function Read-YesNo {
 }
 
 function Refresh-ProcessPath {
-    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
-    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
-    $parts = @($machinePath, $userPath, $env:Path) |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        ForEach-Object { $_ -split ';' } |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        Select-Object -Unique
-    $env:Path = $parts -join ';'
+    $machine = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $user = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $parts = @($machine, $user, $env:Path) -join ';'
+    $env:Path = (($parts -split ';' | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique) -join ';')
 }
 
 function Add-UserPathEntry {
@@ -80,7 +83,7 @@ function Ensure-WingetApplication {
 
     $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
     if (-not $winget) {
-        Write-Warning "winget non disponibile: impossibile installare automaticamente $Name senza usare privilegi amministrativi."
+        Write-Warning "winget non disponibile: impossibile installare automaticamente $Name senza privilegi amministrativi."
         return $false
     }
 
@@ -92,13 +95,6 @@ function Ensure-WingetApplication {
     }
 
     Refresh-ProcessPath
-    $installed = Get-Command $Command -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($installed) {
-        Write-Host "[OK] $Name installato: $($installed.Source)" -ForegroundColor Green
-    }
-    else {
-        Write-Warning "$Name risulta installato ma non è ancora visibile nella sessione corrente. Potrebbe essere necessario riaprire PowerShell."
-    }
     return $true
 }
 
@@ -137,13 +133,18 @@ function Ensure-MesloFont {
     if (-not (Read-YesNo -Prompt 'MesloLGM Nerd Font non trovato. Installarlo per il solo utente corrente? [S/N]' -Default $true)) {
         return
     }
+
     Refresh-ProcessPath
-    $omp = Get-Command oh-my-posh.exe -ErrorAction SilentlyContinue
+    $omp = Get-Command oh-my-posh.exe -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $omp) {
-        Write-Warning 'Oh My Posh non è disponibile nella sessione. Esegui dopo aver riaperto PowerShell: oh-my-posh font install meslo'
+        Write-Warning 'Oh My Posh non è disponibile nella sessione: impossibile installare automaticamente Meslo.'
         return
     }
+
     & $omp.Source font install meslo
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning 'Installazione Meslo Nerd Font non riuscita.'
+    }
 }
 
 function Test-SafeOcSource {
@@ -175,7 +176,7 @@ function Ensure-OcClient {
     $existing = Get-Command oc.exe -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($existing) {
         Write-Host "oc.exe trovato: $($existing.Source)" -ForegroundColor Cyan
-        try { & $existing.Source version --client } catch { }
+        try { & $existing.Source version --client | Out-Host } catch { }
         if (Read-YesNo -Prompt 'Vuoi usare questa versione di oc.exe? [S/N]' -Default $true) {
             return $existing.Source
         }
@@ -229,8 +230,8 @@ function Save-InstallOptions {
     param([Parameter(Mandatory)]$Options)
 
     New-Item -ItemType Directory -Path $script:RuntimeRoot -Force | Out-Null
-    ([pscustomobject]@{ OpenShiftStern = [bool]$Options.OpenShiftStern } | ConvertTo-Json) |
-        Set-Content -LiteralPath $script:OptionsPath -Encoding UTF8
+    $json = ([pscustomobject]@{ OpenShiftStern = [bool]$Options.OpenShiftStern } | ConvertTo-Json) + [Environment]::NewLine
+    [IO.File]::WriteAllText($script:OptionsPath, $json, [Text.UTF8Encoding]::new($false))
 }
 
 function Copy-TextFileUtf8 {
@@ -244,38 +245,33 @@ function Copy-TextFileUtf8 {
     [IO.File]::WriteAllText($Destination, $content, [Text.UTF8Encoding]::new($false))
 }
 
-function Get-TextEncoding {
+function Get-ProfileEncoding {
     param([Parameter(Mandatory)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return [Text.UTF8Encoding]::new($false)
+    }
 
     $bytes = [IO.File]::ReadAllBytes($Path)
     if ($bytes.Length -ge 4) {
-        if ($bytes[0] -eq 0x00 -and $bytes[1] -eq 0x00 -and $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF) {
-            return [Text.UTF32Encoding]::new($true, $true)
-        }
         if ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE -and $bytes[2] -eq 0x00 -and $bytes[3] -eq 0x00) {
             return [Text.UTF32Encoding]::new($false, $true)
+        }
+        if ($bytes[0] -eq 0x00 -and $bytes[1] -eq 0x00 -and $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF) {
+            return [Text.UTF32Encoding]::new($true, $true)
         }
     }
     if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
         return [Text.UTF8Encoding]::new($true)
     }
-    if ($bytes.Length -ge 2) {
-        if ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
-            return [Text.UnicodeEncoding]::new($false, $true)
-        }
-        if ($bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
-            return [Text.UnicodeEncoding]::new($true, $true)
-        }
+    if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+        return [Text.UnicodeEncoding]::new($false, $true)
+    }
+    if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+        return [Text.UnicodeEncoding]::new($true, $true)
     }
 
-    try {
-        $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
-        [void]$strictUtf8.GetString($bytes)
-        return [Text.UTF8Encoding]::new($false)
-    }
-    catch {
-        return [Text.Encoding]::Default
-    }
+    return [Text.UTF8Encoding]::new($false)
 }
 
 function Backup-Profile {
@@ -304,11 +300,8 @@ $endMarker
 "@
 
     $exists = Test-Path -LiteralPath $ProfilePath -PathType Leaf
-    $profileEncoding = if ($exists) { Get-TextEncoding -Path $ProfilePath } else { [Text.UTF8Encoding]::new($false) }
-    $original = if ($exists) {
-        [IO.File]::ReadAllText($ProfilePath, $profileEncoding)
-    }
-    else { '' }
+    $encoding = Get-ProfileEncoding -Path $ProfilePath
+    $original = if ($exists) { [IO.File]::ReadAllText($ProfilePath, $encoding) } else { '' }
 
     $pattern = '(?ms)^\s*' + [regex]::Escape($startMarker) + '.*?^\s*' +
         [regex]::Escape($endMarker) + '[ \t]*(?:\r?\n)?'
@@ -337,11 +330,11 @@ $endMarker
 
     if ($exists) {
         Backup-Profile -ProfilePath $ProfilePath
-        Write-Host 'Profilo PowerShell esistente preservato; aggiungo/aggiorno solo il blocco gestito.' -ForegroundColor Cyan
+        Write-Host 'Profilo PowerShell esistente preservato; modifico soltanto il blocco gestito.' -ForegroundColor Cyan
     }
 
     New-Item -ItemType Directory -Path (Split-Path -Parent $ProfilePath) -Force | Out-Null
-    [IO.File]::WriteAllText($ProfilePath, $updated, $profileEncoding)
+    [IO.File]::WriteAllText($ProfilePath, $updated, $encoding)
 }
 
 function Install-RuntimeFiles {
@@ -357,7 +350,7 @@ function Install-RuntimeFiles {
         if (-not (Test-Path -LiteralPath $localConfig -PathType Leaf)) {
             Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot 'config\openshift.example.json') -Destination $localConfig
             Write-Host "Creato esempio locale OpenShift: $localConfig" -ForegroundColor Yellow
-            Write-Host 'Personalizzalo con i cluster, namespace e servizi della tua azienda.' -ForegroundColor Yellow
+            Write-Host 'Personalizzalo con cluster, namespace e servizi della tua azienda.' -ForegroundColor Yellow
         }
     }
     elseif (Test-Path -LiteralPath $featureTarget -PathType Leaf) {
@@ -365,48 +358,69 @@ function Install-RuntimeFiles {
     }
 }
 
-function Install-WindowsTerminalFragment {
-    param([Parameter(Mandatory)]$Options)
+function Install-Graphics {
+    $generator = Join-Path $PSScriptRoot 'assets\New-PublicAssets.ps1'
+    & $generator -OutputRoot $script:AssetRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Generazione asset grafici non riuscita.'
+    }
+}
 
+function Install-WindowsTerminalFragment {
     New-Item -ItemType Directory -Path $script:FragmentRoot -Force | Out-Null
 
     Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot 'cybergpt\Start-CyberProfile.ps1') -Destination (Join-Path $script:FragmentRoot 'Start-CyberProfile.ps1')
 
     $themeDir = Join-Path $script:FragmentRoot 'themes'
     New-Item -ItemType Directory -Path $themeDir -Force | Out-Null
-    foreach ($theme in @('matrix_neon_gpt.omp.json', 'cyber_glass_gpt.omp.json', 'neon_dev_gpt.omp.json')) {
+    foreach ($theme in @('matrix_neon_gpt.omp.json', 'cyber_glass_gpt.omp.json', 'neon_dev_gpt.omp.json', 'stern_hud_gpt.omp.json')) {
         Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot "cybergpt\themes\$theme") -Destination (Join-Path $themeDir $theme)
     }
-    $sternTheme = Join-Path $themeDir 'stern_hud_gpt.omp.json'
-    if ($Options.OpenShiftStern) {
-        Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot 'cybergpt\themes\stern_hud_gpt.omp.json') -Destination $sternTheme
-    }
-    elseif (Test-Path -LiteralPath $sternTheme) {
-        Remove-Item -LiteralPath $sternTheme -Force
-    }
 
+    $shaderDir = Join-Path $script:FragmentRoot 'shaders'
+    New-Item -ItemType Directory -Path $shaderDir -Force | Out-Null
     foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hlsl')) {
-        Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot "cybergpt\shaders\$shader") -Destination (Join-Path $script:FragmentRoot $shader)
+        Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot "cybergpt\shaders\$shader") -Destination (Join-Path $shaderDir $shader)
     }
 
-    $fragmentSource = Join-Path $PSScriptRoot 'windows-terminal\managed-settings.json'
-    $fragment = [IO.File]::ReadAllText($fragmentSource) | ConvertFrom-Json
-    $profiles = @($fragment.profiles | Where-Object {
-        $feature = $_.PSObject.Properties['feature']
-        -not $feature -or ($Options.OpenShiftStern -and [string]$feature.Value -eq 'OpenShiftStern')
-    })
-    foreach ($profile in $profiles) {
-        if ($profile.PSObject.Properties['feature']) {
-            $profile.PSObject.Properties.Remove('feature')
+    $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'windows-terminal\managed-settings.json'))
+    $fragmentJsonRoot = $script:FragmentRoot.Replace('\', '\\')
+    $assetJsonRoot = $script:AssetRoot.Replace('\', '\\')
+    $rendered = $template.Replace('{{FRAGMENT_ROOT}}', $fragmentJsonRoot).Replace('{{ASSET_ROOT}}', $assetJsonRoot)
+
+    $validated = $rendered | ConvertFrom-Json
+    $json = ($validated | ConvertTo-Json -Depth 100) + [Environment]::NewLine
+    [IO.File]::WriteAllText((Join-Path $script:FragmentRoot 'powershell-customization.json'), $json, [Text.UTF8Encoding]::new($false))
+}
+
+function Build-Launchers {
+    $buildScript = Join-Path $PSScriptRoot 'launchers\src\build.ps1'
+    & $buildScript -OutputDirectory $script:LauncherRoot -AssetRoot $script:AssetRoot | Out-Host
+
+    $expected = @('Matrix GPT.exe', 'Cyber Glass.exe', 'Neon Dev.exe', 'Stern HUD.exe')
+    foreach ($name in $expected) {
+        $path = Join-Path $script:LauncherRoot $name
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "Launcher non prodotto: $path"
         }
     }
-    $schemes = @($fragment.schemes | Where-Object {
-        $Options.OpenShiftStern -or [string]$_.name -ne 'stern_hud_gpt'
-    })
+}
 
-    $output = [ordered]@{ profiles = $profiles; schemes = $schemes }
-    $json = ($output | ConvertTo-Json -Depth 100) + [Environment]::NewLine
-    [IO.File]::WriteAllText((Join-Path $script:FragmentRoot 'powershell-customization.json'), $json, [Text.UTF8Encoding]::new($false))
+function Install-LauncherShortcuts {
+    $startMenuRoot = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\PowerShell Customization'
+    New-Item -ItemType Directory -Path $startMenuRoot -Force | Out-Null
+    $shell = New-Object -ComObject WScript.Shell
+
+    foreach ($name in @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD')) {
+        $exe = Join-Path $script:LauncherRoot "$name.exe"
+        $shortcutPath = Join-Path $startMenuRoot "$name.lnk"
+        $shortcut = $shell.CreateShortcut($shortcutPath)
+        $shortcut.TargetPath = $exe
+        $shortcut.WorkingDirectory = $script:LauncherRoot
+        $shortcut.IconLocation = "$exe,0"
+        $shortcut.Description = "PowerShell Customization - $name"
+        $shortcut.Save()
+    }
 }
 
 $options = Get-InstallOptions
@@ -427,7 +441,10 @@ if (-not $SkipDependencies) {
 }
 
 Install-RuntimeFiles -Options $options
-Install-WindowsTerminalFragment -Options $options
+Install-Graphics
+Install-WindowsTerminalFragment
+Build-Launchers
+Install-LauncherShortcuts
 
 $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
 $powerShell7Profile = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
@@ -436,5 +453,8 @@ Update-ManagedProfileBlock -ProfilePath $powerShell7Profile
 Write-Host ''
 Write-Host 'Installazione completata.' -ForegroundColor Green
 Write-Host "Profilo PowerShell 7: $powerShell7Profile"
+Write-Host "Asset PNG/ICO: $script:AssetRoot"
 Write-Host "Windows Terminal fragments: $script:FragmentRoot"
-Write-Host 'Il contenuto e la codifica del profilo PowerShell preesistente vengono preservati.' -ForegroundColor Cyan
+Write-Host "Launcher EXE: $script:LauncherRoot"
+Write-Host 'Creati: Matrix GPT.exe, Cyber Glass.exe, Neon Dev.exe, Stern HUD.exe' -ForegroundColor Green
+Write-Host 'Il contenuto preesistente del profilo PowerShell non viene sovrascritto.' -ForegroundColor Cyan
