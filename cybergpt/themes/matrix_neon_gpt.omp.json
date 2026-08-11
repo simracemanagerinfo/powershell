@@ -1,0 +1,18 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "version": 4,
+  "final_space": true,
+  "console_title_template": "MATRIX // {{.PWD}}",
+  "blocks": [
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "segments": [
+        { "type": "text", "style": "plain", "foreground": "#00FF41", "template": "PS " },
+        { "type": "path", "style": "plain", "foreground": "#00FF41", "options": { "style": "full" }, "template": "{{ .Path }}" },
+        { "type": "git", "style": "plain", "foreground": "#B7FFD1", "template": " <#D7FF72>git</>:(<#00FF72>{{ .HEAD }}</>{{ if .Working.Changed }} <#FF5C57>*{{ .Working.String }}</>{{ end }})" },
+        { "type": "status", "style": "plain", "foreground": "#00FF41", "foreground_templates": ["{{ if gt .Code 0 }}#FF5C57{{ end }}"], "options": { "always_enabled": true }, "template": " ❯ " }
+      ]
+    }
+  ]
+}
