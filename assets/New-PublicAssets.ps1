@@ -58,7 +58,8 @@ function New-CyberBitmap {
         $brush.Dispose()
 
         $accentColor = Convert-HexColor $Accent
-        $gridPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(42, $accentColor), 1)
+        $gridColor = [System.Drawing.Color]::FromArgb(42, [int]$accentColor.R, [int]$accentColor.G, [int]$accentColor.B)
+        $gridPen = [System.Drawing.Pen]::new($gridColor, 1)
         $horizon = [int]($Height * 0.58)
         for ($x = -$Width; $x -lt ($Width * 2); $x += [Math]::Max(50, [int]($Width / 18))) {
             $graphics.DrawLine($gridPen, [int]($Width / 2), $horizon, $x, $Height)
@@ -68,19 +69,21 @@ function New-CyberBitmap {
         }
         $gridPen.Dispose()
 
-        $glowPen = [System.Drawing.Pen]::new([System.Drawing.Color]::FromArgb(105, $accentColor), [Math]::Max(2, [int]($Width / 500)))
+        $glowColor = [System.Drawing.Color]::FromArgb(105, [int]$accentColor.R, [int]$accentColor.G, [int]$accentColor.B)
+        $glowPen = [System.Drawing.Pen]::new($glowColor, [Math]::Max(2, [int]($Width / 500)))
         $graphics.DrawLine($glowPen, 0, $horizon, $Width, $horizon)
         $graphics.DrawRectangle($glowPen, 18, 18, $Width - 37, $Height - 37)
         $glowPen.Dispose()
     }
 
-    $accent = Convert-HexColor $Accent
+    $accentColorForText = Convert-HexColor $Accent
     $titleSize = [Math]::Max(16, [int]($Width / 18))
     $subtitleSize = [Math]::Max(10, [int]($Width / 42))
     $titleFont = [System.Drawing.Font]::new('Segoe UI', $titleSize, [System.Drawing.FontStyle]::Bold, [System.Drawing.GraphicsUnit]::Pixel)
     $subtitleFont = [System.Drawing.Font]::new('Consolas', $subtitleSize, [System.Drawing.FontStyle]::Regular, [System.Drawing.GraphicsUnit]::Pixel)
-    $titleBrush = [System.Drawing.SolidBrush]::new($accent)
-    $subtitleBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(205, 220, 235, 245))
+    $titleBrush = [System.Drawing.SolidBrush]::new($accentColorForText)
+    $subtitleColor = [System.Drawing.Color]::FromArgb(205, 220, 235, 245)
+    $subtitleBrush = [System.Drawing.SolidBrush]::new($subtitleColor)
 
     $graphics.DrawString($Title, $titleFont, $titleBrush, 34, 32)
     $graphics.DrawString($Subtitle, $subtitleFont, $subtitleBrush, 38, 32 + $titleSize + 8)
