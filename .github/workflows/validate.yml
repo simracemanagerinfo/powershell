@@ -76,7 +76,12 @@ jobs:
             }
           }
 
-      - name: Build four launcher executables
+          $backgroundCount = @(Get-ChildItem -LiteralPath (Join-Path $assetRoot 'backgrounds\pool') -Filter *.png -File).Count
+          if ($backgroundCount -ne 6) {
+            throw "Attesi 6 wallpaper Cyber Glass, trovati $backgroundCount."
+          }
+
+      - name: Build four launcher executables with existing toolchain
         shell: pwsh
         run: |
           $assetRoot = Join-Path $env:RUNNER_TEMP 'powershell-customization-assets'
@@ -93,3 +98,87 @@ jobs:
           if (@(Get-ChildItem -LiteralPath $outputRoot -Filter *.exe -File).Count -ne 4) {
             throw 'La build deve produrre esattamente quattro EXE.'
           }
+
+      - name: Build four launchers with portable no-install toolchain
+        shell: pwsh
+        run: |
+          $assetRoot = Join-Path $env:RUNNER_TEMP 'powershell-customization-assets'
+          $outputRoot = Join-Path $env:RUNNER_TEMP 'powershell-customization-launchers-portable'
+          ./launchers/src/build.ps1 -OutputDirectory $outputRoot -AssetRoot $assetRoot -ForcePortableToolchain
+
+          $expected = @('Matrix GPT.exe', 'Cyber Glass.exe', 'Neon Dev.exe', 'Stern HUD.exe')
+          foreach ($name in $expected) {
+            if (-not (Test-Path -LiteralPath (Join-Path $outputRoot $name) -PathType Leaf)) {
+              throw "Launcher portable non generato: $name"
+            }
+          }
+          if (@(Get-ChildItem -LiteralPath $outputRoot -Filter *.exe -File).Count -ne 4) {
+            throw 'La build portable deve produrre esattamente quattro EXE.'
+          }
+
+      - name: Test full installer preserves an existing profile
+        shell: pwsh
+        run: |
+          $profileRoot = Join-Path $env:RUNNER_TEMP 'existing-colleague-profile'
+          $profilePath = Join-Path $profileRoot 'Microsoft.PowerShell_profile.ps1'
+          New-Item -ItemType Directory -Path $profileRoot -Force | Out-Null
+
+          $existing = @'
+          # PROFILE DEL COLLEGA - NON TOCCARE
+          $global:ColleagueSetting = 'DO_NOT_TOUCH'
+          function Existing-ColleagueFunction { 'preserved' }
+          Set-Alias colleague Existing-ColleagueFunction
+          '@
+          $encoding = [Text.UnicodeEncoding]::new($false, $true)
+          [IO.File]::WriteAllText($profilePath, $existing, $encoding)
+          $originalBytes = [IO.File]::ReadAllBytes($profilePath)
+          if ($originalBytes[0] -ne 0xFF -or $originalBytes[1] -ne 0xFE) {
+            throw 'Il profilo di test non è UTF-16 LE con BOM.'
+          }
+
+          ./install.ps1 -SkipDependencies -OpenShiftSternOverride:$false -ProfilePathOverride $profilePath
+
+          $afterFirstBytes = [IO.File]::ReadAllBytes($profilePath)
+          if ($afterFirstBytes[0] -ne 0xFF -or $afterFirstBytes[1] -ne 0xFE) {
+            throw 'La codifica/BOM del profilo esistente è stata modificata.'
+          }
+
+          $afterFirst = [IO.File]::ReadAllText($profilePath, $encoding)
+          foreach ($required in @(
+            '# PROFILE DEL COLLEGA - NON TOCCARE',
+            '$global:ColleagueSetting = ''DO_NOT_TOUCH''',
+            'function Existing-ColleagueFunction { ''preserved'' }',
+            'Set-Alias colleague Existing-ColleagueFunction'
+          )) {
+            if (-not $afterFirst.Contains($required)) {
+              throw "Contenuto preesistente perso o modificato: $required"
+            }
+          }
+
+          $startMarker = '# >>> powershell-customization managed >>>'
+          $endMarker = '# <<< powershell-customization managed <<<'
+          if ([regex]::Matches($afterFirst, [regex]::Escape($startMarker)).Count -ne 1 -or
+              [regex]::Matches($afterFirst, [regex]::Escape($endMarker)).Count -ne 1) {
+            throw 'Il blocco gestito deve comparire esattamente una volta.'
+          }
+
+          $hashBeforeSecondRun = (Get-FileHash -LiteralPath $profilePath -Algorithm SHA256).Hash
+          ./install.ps1 -SkipDependencies -OpenShiftSternOverride:$false -ProfilePathOverride $profilePath
+          $hashAfterSecondRun = (Get-FileHash -LiteralPath $profilePath -Algorithm SHA256).Hash
+
+          if ($hashBeforeSecondRun -ne $hashAfterSecondRun) {
+            throw 'La seconda installazione ha modificato nuovamente un profilo già configurato.'
+          }
+
+          $launcherRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization\launchers'
+          foreach ($name in @('Matrix GPT.exe', 'Cyber Glass.exe', 'Neon Dev.exe', 'Stern HUD.exe')) {
+            if (-not (Test-Path -LiteralPath (Join-Path $launcherRoot $name) -PathType Leaf)) {
+              throw "Installer completo non ha prodotto $name"
+            }
+          }
+
+          $fragment = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization\powershell-customization.json'
+          if (-not (Test-Path -LiteralPath $fragment -PathType Leaf)) {
+            throw 'Installer completo non ha prodotto il JSON Fragment di Windows Terminal.'
+          }
+          [void]([IO.File]::ReadAllText($fragment) | ConvertFrom-Json)
