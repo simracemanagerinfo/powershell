@@ -292,7 +292,7 @@ function Update-ManagedProfileBlock {
 
     $startMarker = '# >>> powershell-customization managed >>>'
     $endMarker = '# <<< powershell-customization managed <<<'
-    $managedBlock = @"
+    $managedBlock = (@"
 $startMarker
 `$runtimeRoot = Join-Path `$env:LOCALAPPDATA 'PowerShellCustomization'
 . (Join-Path `$runtimeRoot 'common.ps1')
@@ -301,13 +301,13 @@ if (Test-Path -LiteralPath `$openShiftFeature -PathType Leaf) {
     . `$openShiftFeature
 }
 $endMarker
-"@
+"@).TrimEnd("`r", "`n")
 
     $exists = Test-Path -LiteralPath $ProfilePath -PathType Leaf
     $encoding = Get-ProfileEncoding -Path $ProfilePath
     $original = if ($exists) { [IO.File]::ReadAllText($ProfilePath, $encoding) } else { '' }
 
-    $pattern = '(?ms)^\s*' + [regex]::Escape($startMarker) + '.*?^\s*' +
+    $pattern = '(?ms)^' + [regex]::Escape($startMarker) + '.*?^' +
         [regex]::Escape($endMarker) + '[ \t]*(?:\r?\n)?'
     $matches = [regex]::Matches($original, $pattern)
 
