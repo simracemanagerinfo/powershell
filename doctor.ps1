@@ -3,6 +3,8 @@ param()
 
 $ErrorActionPreference = 'Continue'
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+$assetRoot = Join-Path $runtimeRoot 'assets'
+$launcherRoot = Join-Path $runtimeRoot 'launchers'
 $fragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
 $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
 $profilePath = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
@@ -49,6 +51,23 @@ Add-Result -Name 'MesloLGM Nerd Font' -Status $(if ($fontFound) { 'PASS' } else 
 $fragment = Join-Path $fragmentRoot 'powershell-customization.json'
 Add-Result -Name 'Windows Terminal fragment' -Status $(if (Test-Path -LiteralPath $fragment -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $fragment
 
+foreach ($asset in @(
+    'icons\matrix_gpt.ico',
+    'icons\matrix_gpt_clear.ico',
+    'icons\svi_gpt_original.ico',
+    'icons\stern_logs.ico',
+    'watermarks\svi_gpt.png',
+    'watermarks\stern_logs.png',
+    'backgrounds\current.png')) {
+    $path = Join-Path $assetRoot $asset
+    Add-Result -Name "Asset $asset" -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
+}
+
+foreach ($launcher in @('Matrix GPT.exe', 'Cyber Glass.exe', 'Neon Dev.exe', 'Stern HUD.exe')) {
+    $path = Join-Path $launcherRoot $launcher
+    Add-Result -Name $launcher -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
+}
+
 $profileExists = Test-Path -LiteralPath $profilePath -PathType Leaf
 $profileManaged = $false
 if ($profileExists) {
@@ -79,7 +98,7 @@ if ($openShiftEnabled) {
     Add-Result -Name 'Configurazione OpenShift locale' -Status $(if (Test-Path -LiteralPath $openShiftConfig -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $openShiftConfig
 }
 else {
-    Add-Result -Name 'OpenShift / Stern' -Status 'SKIP' -Details 'Feature disabilitata'
+    Add-Result -Name 'OpenShift / Stern CLI' -Status 'SKIP' -Details 'Feature disabilitata; Stern HUD grafico resta installato'
 }
 
 $results | Format-Table -AutoSize
