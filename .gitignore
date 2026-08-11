@@ -1,0 +1,46 @@
+# Runtime/local state
+*.log
+*.tmp
+*.bak
+*.backup-*
+backups/
+logs/
+state/
+
+# Local configuration and secrets
+.env
+.env.*
+*.local.ps1
+*.local.json
+secrets/
+*.credential
+*.credentials
+*.pfx
+*.p12
+*.pem
+*.key
+
+# SSH material is intentionally not part of this public repository
+.ssh/
+ssh/
+known_hosts
+known_hosts.old
+id_rsa
+id_dsa
+id_ecdsa
+id_ed25519
+
+# Generated/runtime CyberGPT files
+cybergpt/backgrounds/current.png
+cybergpt/backgrounds/.last-background*
+
+# Build/system output
+*.obj
+*.o
+*.res
+*.lnk
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.swp
+*~
