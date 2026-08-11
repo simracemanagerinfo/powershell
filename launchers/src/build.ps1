@@ -4,7 +4,10 @@ param(
     [string]$OutputDirectory,
 
     [Parameter(Mandatory)]
-    [string]$AssetRoot
+    [string]$AssetRoot,
+
+    [Parameter(DontShow)]
+    [switch]$ForcePortableToolchain
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,10 +73,15 @@ function Get-PortableLlvmToolchain {
 }
 
 function Get-BuildToolchain {
-    $existing = Get-ExistingGnuToolchain
-    if ($existing) {
-        Write-Host "Uso gcc/windres già presenti: $($existing.Compiler)" -ForegroundColor DarkGray
-        return $existing
+    if (-not $ForcePortableToolchain) {
+        $existing = Get-ExistingGnuToolchain
+        if ($existing) {
+            Write-Host "Uso gcc/windres già presenti: $($existing.Compiler)" -ForegroundColor DarkGray
+            return $existing
+        }
+    }
+    else {
+        Write-Host 'Test/uso forzato della toolchain LLVM-MinGW portable.' -ForegroundColor DarkGray
     }
     return Get-PortableLlvmToolchain
 }
