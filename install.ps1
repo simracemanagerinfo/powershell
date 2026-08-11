@@ -34,6 +34,17 @@ function Read-YesNo {
     }
 }
 
+function Refresh-ProcessPath {
+    $machinePath = [Environment]::GetEnvironmentVariable('Path', 'Machine')
+    $userPath = [Environment]::GetEnvironmentVariable('Path', 'User')
+    $parts = @($machinePath, $userPath, $env:Path) |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { $_ -split ';' } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique
+    $env:Path = $parts -join ';'
+}
+
 function Add-UserPathEntry {
     param([Parameter(Mandatory)][string]$Directory)
 
@@ -47,9 +58,7 @@ function Add-UserPathEntry {
         $parts += $normalized
         [Environment]::SetEnvironmentVariable('Path', (($parts | Select-Object -Unique) -join ';'), 'User')
     }
-    if (-not (($env:Path -split ';') | Where-Object { $_.TrimEnd('\') -ieq $normalized })) {
-        $env:Path = "$normalized;$env:Path"
-    }
+    Refresh-ProcessPath
 }
 
 function Ensure-WingetApplication {
@@ -82,6 +91,14 @@ function Ensure-WingetApplication {
         return $false
     }
 
+    Refresh-ProcessPath
+    $installed = Get-Command $Command -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($installed) {
+        Write-Host "[OK] $Name installato: $($installed.Source)" -ForegroundColor Green
+    }
+    else {
+        Write-Warning "$Name risulta installato ma non è ancora visibile nella sessione corrente. Potrebbe essere necessario riaprire PowerShell."
+    }
     return $true
 }
 
@@ -120,9 +137,10 @@ function Ensure-MesloFont {
     if (-not (Read-YesNo -Prompt 'MesloLGM Nerd Font non trovato. Installarlo per il solo utente corrente? [S/N]' -Default $true)) {
         return
     }
+    Refresh-ProcessPath
     $omp = Get-Command oh-my-posh.exe -ErrorAction SilentlyContinue
     if (-not $omp) {
-        Write-Warning 'Oh My Posh non è disponibile nella sessione. Esegui: oh-my-posh font install meslo'
+        Write-Warning 'Oh My Posh non è disponibile nella sessione. Esegui dopo aver riaperto PowerShell: oh-my-posh font install meslo'
         return
     }
     & $omp.Source font install meslo
@@ -226,6 +244,40 @@ function Copy-TextFileUtf8 {
     [IO.File]::WriteAllText($Destination, $content, [Text.UTF8Encoding]::new($false))
 }
 
+function Get-TextEncoding {
+    param([Parameter(Mandatory)][string]$Path)
+
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -ge 4) {
+        if ($bytes[0] -eq 0x00 -and $bytes[1] -eq 0x00 -and $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF) {
+            return [Text.UTF32Encoding]::new($true, $true)
+        }
+        if ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE -and $bytes[2] -eq 0x00 -and $bytes[3] -eq 0x00) {
+            return [Text.UTF32Encoding]::new($false, $true)
+        }
+    }
+    if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {
+        return [Text.UTF8Encoding]::new($true)
+    }
+    if ($bytes.Length -ge 2) {
+        if ($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE) {
+            return [Text.UnicodeEncoding]::new($false, $true)
+        }
+        if ($bytes[0] -eq 0xFE -and $bytes[1] -eq 0xFF) {
+            return [Text.UnicodeEncoding]::new($true, $true)
+        }
+    }
+
+    try {
+        $strictUtf8 = [Text.UTF8Encoding]::new($false, $true)
+        [void]$strictUtf8.GetString($bytes)
+        return [Text.UTF8Encoding]::new($false)
+    }
+    catch {
+        return [Text.Encoding]::Default
+    }
+}
+
 function Backup-Profile {
     param([Parameter(Mandatory)][string]$ProfilePath)
 
@@ -251,8 +303,10 @@ if (Test-Path -LiteralPath `$openShiftFeature -PathType Leaf) {
 $endMarker
 "@
 
-    $original = if (Test-Path -LiteralPath $ProfilePath -PathType Leaf) {
-        [IO.File]::ReadAllText($ProfilePath)
+    $exists = Test-Path -LiteralPath $ProfilePath -PathType Leaf
+    $profileEncoding = if ($exists) { Get-TextEncoding -Path $ProfilePath } else { [Text.UTF8Encoding]::new($false) }
+    $original = if ($exists) {
+        [IO.File]::ReadAllText($ProfilePath, $profileEncoding)
     }
     else { '' }
 
@@ -281,13 +335,13 @@ $endMarker
         return
     }
 
-    if ($original.Length -gt 0) {
+    if ($exists) {
         Backup-Profile -ProfilePath $ProfilePath
         Write-Host 'Profilo PowerShell esistente preservato; aggiungo/aggiorno solo il blocco gestito.' -ForegroundColor Cyan
     }
 
     New-Item -ItemType Directory -Path (Split-Path -Parent $ProfilePath) -Force | Out-Null
-    [IO.File]::WriteAllText($ProfilePath, $updated, [Text.UTF8Encoding]::new($false))
+    [IO.File]::WriteAllText($ProfilePath, $updated, $profileEncoding)
 }
 
 function Install-RuntimeFiles {
@@ -383,4 +437,4 @@ Write-Host ''
 Write-Host 'Installazione completata.' -ForegroundColor Green
 Write-Host "Profilo PowerShell 7: $powerShell7Profile"
 Write-Host "Windows Terminal fragments: $script:FragmentRoot"
-Write-Host 'Il contenuto preesistente del profilo PowerShell non viene sovrascritto.' -ForegroundColor Cyan
+Write-Host 'Il contenuto e la codifica del profilo PowerShell preesistente vengono preservati.' -ForegroundColor Cyan
