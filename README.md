@@ -12,10 +12,12 @@ Core grafico:
 - PSReadLine
 - Terminal-Icons
 - MesloLGM Nerd Font
-- temi Matrix Neon, Cyber Glass e Neon Dev
+- temi Matrix Neon, Cyber Glass, Neon Dev e Stern HUD
 - pixel shader per Windows Terminal
+- asset PNG/ICO usati dai profili
+- quattro launcher Windows compilati durante l'installazione
 
-Non installa JDK, Maven, NVM, CMake, BusyBox o altre toolchain da sviluppatore: non sono necessarie per la personalizzazione PowerShell.
+Non installa JDK, Maven, NVM, CMake, BusyBox o altre toolchain da sviluppatore non necessarie al terminale.
 
 ## Installazione
 
@@ -32,6 +34,35 @@ Per verificare l'ambiente dopo l'installazione:
 ```powershell
 .\doctor.ps1
 ```
+
+## I quattro EXE
+
+Gli eseguibili non sono versionati nel repository: vengono compilati localmente da `install.ps1` a partire dai sorgenti presenti in `launchers/src`.
+
+A fine installazione devono esistere:
+
+```text
+%LOCALAPPDATA%\PowerShellCustomization\launchers\Matrix GPT.exe
+%LOCALAPPDATA%\PowerShellCustomization\launchers\Cyber Glass.exe
+%LOCALAPPDATA%\PowerShellCustomization\launchers\Neon Dev.exe
+%LOCALAPPDATA%\PowerShellCustomization\launchers\Stern HUD.exe
+```
+
+Vengono inoltre creati quattro collegamenti nel menu Start sotto **PowerShell Customization**.
+
+Se sul PC sono già disponibili `gcc.exe` e `windres.exe`, vengono usati. Altrimenti il build scarica una toolchain LLVM-MinGW portable nella cache locale dell'applicazione e la usa senza installarla globalmente e senza aggiungerla al PATH dell'utente.
+
+## PNG e ICO
+
+Anche gli asset grafici sono riproducibili durante l'installazione. `assets/New-PublicAssets.ps1` genera nel profilo utente:
+
+```text
+%LOCALAPPDATA%\PowerShellCustomization\assets\icons
+%LOCALAPPDATA%\PowerShellCustomization\assets\backgrounds
+%LOCALAPPDATA%\PowerShellCustomization\assets\watermarks
+```
+
+Cyber Glass mantiene un pool di sei wallpaper e il suo launcher cambia `current.png` prima di aprire Windows Terminal, evitando quando possibile di ripetere immediatamente lo stesso sfondo.
 
 ## Il tuo profile non viene sovrascritto
 
@@ -63,19 +94,21 @@ Non viene sostituito il `settings.json` personale dell'utente.
 
 ## OpenShift / Stern opzionale
 
+Il **tema grafico Stern HUD e il relativo EXE vengono sempre installati**. Il supporto operativo OpenShift/Stern rimane invece opzionale.
+
 Durante l'installazione viene chiesto:
 
 ```text
 Ti serve il supporto OpenShift / Stern? [S/N]
 ```
 
-Se la risposta è `N`, non vengono installati Stern, `oc.exe`, il profilo Stern HUD o le funzioni OpenShift.
+Se la risposta è `N`, non vengono installati `stern.exe`, `oc.exe` o le funzioni OpenShift; `Stern HUD.exe` resta comunque disponibile come profilo grafico.
 
 Se la risposta è `S`:
 
 - se `oc.exe` esiste già, viene mostrato e si può scegliere se usarlo;
 - altrimenti viene richiesto un link diretto a `oc.exe` oppure un path locale;
-- Stern viene installato solo come feature opzionale;
+- Stern viene installato come feature opzionale;
 - viene creato un `openshift.local.json` locale da personalizzare con cluster, namespace e servizi.
 
 Endpoint, namespace e nomi di servizi reali **non appartengono al repository pubblico**.
@@ -95,10 +128,11 @@ Non devono essere versionati:
 - URL di cluster aziendali;
 - namespace e nomi di servizi aziendali;
 - path specifici del singolo PC;
-- configurazioni locali OpenShift.
+- configurazioni locali OpenShift;
+- EXE compilati e cache della toolchain.
 
 I file `*.local.ps1` e `*.local.json` sono ignorati da Git.
 
 ## Portabilità
 
-La parte PowerShell / Oh My Posh è pensata per essere portabile anche su macOS e Linux. Le integrazioni specifiche di Windows Terminal, come JSON Fragments e pixel shader, sono invece Windows-specifiche e richiederanno un adattatore per il terminale scelto sugli altri sistemi.
+La parte PowerShell / Oh My Posh è pensata per essere portabile anche su macOS e Linux. Le integrazioni specifiche di Windows Terminal, come JSON Fragments, launcher Win32 e pixel shader, sono invece Windows-specifiche e richiederanno un adattatore per il terminale scelto sugli altri sistemi.
