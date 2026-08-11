@@ -53,3 +53,43 @@ jobs:
               exit 1
             }
           }
+
+      - name: Generate public PNG and ICO assets
+        shell: pwsh
+        run: |
+          $assetRoot = Join-Path $env:RUNNER_TEMP 'powershell-customization-assets'
+          ./assets/New-PublicAssets.ps1 -OutputRoot $assetRoot
+
+          $expected = @(
+            'icons/matrix_gpt.ico',
+            'icons/matrix_gpt_clear.ico',
+            'icons/svi_gpt_original.ico',
+            'icons/stern_logs.ico',
+            'watermarks/svi_gpt.png',
+            'watermarks/stern_logs.png',
+            'backgrounds/current.png'
+          )
+          foreach ($relative in $expected) {
+            $path = Join-Path $assetRoot $relative
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Asset non generato: $path"
+            }
+          }
+
+      - name: Build four launcher executables
+        shell: pwsh
+        run: |
+          $assetRoot = Join-Path $env:RUNNER_TEMP 'powershell-customization-assets'
+          $outputRoot = Join-Path $env:RUNNER_TEMP 'powershell-customization-launchers'
+          ./launchers/src/build.ps1 -OutputDirectory $outputRoot -AssetRoot $assetRoot
+
+          $expected = @('Matrix GPT.exe', 'Cyber Glass.exe', 'Neon Dev.exe', 'Stern HUD.exe')
+          foreach ($name in $expected) {
+            $path = Join-Path $outputRoot $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Launcher non generato: $path"
+            }
+          }
+          if (@(Get-ChildItem -LiteralPath $outputRoot -Filter *.exe -File).Count -ne 4) {
+            throw 'La build deve produrre esattamente quattro EXE.'
+          }
