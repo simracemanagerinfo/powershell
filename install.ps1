@@ -5,7 +5,11 @@ param(
 
     [Parameter(DontShow)]
     [AllowNull()]
-    [Nullable[bool]]$OpenShiftSternOverride
+    [Nullable[bool]]$OpenShiftSternOverride,
+
+    [Parameter(DontShow)]
+    [AllowNull()]
+    [string]$ProfilePathOverride
 )
 
 $ErrorActionPreference = 'Stop'
@@ -361,9 +365,6 @@ function Install-RuntimeFiles {
 function Install-Graphics {
     $generator = Join-Path $PSScriptRoot 'assets\New-PublicAssets.ps1'
     & $generator -OutputRoot $script:AssetRoot
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Generazione asset grafici non riuscita.'
-    }
 }
 
 function Install-WindowsTerminalFragment {
@@ -446,8 +447,13 @@ Install-WindowsTerminalFragment
 Build-Launchers
 Install-LauncherShortcuts
 
-$documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
-$powerShell7Profile = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+$powerShell7Profile = if (-not [string]::IsNullOrWhiteSpace($ProfilePathOverride)) {
+    [IO.Path]::GetFullPath($ProfilePathOverride)
+}
+else {
+    $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
+    Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+}
 Update-ManagedProfileBlock -ProfilePath $powerShell7Profile
 
 Write-Host ''
