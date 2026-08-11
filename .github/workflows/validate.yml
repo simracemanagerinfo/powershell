@@ -1,0 +1,55 @@
+name: Validate PowerShell customization
+
+on:
+  push:
+    branches:
+      - main
+      - agent/**
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Recurse -File -Include *.ps1,*.psm1,*.psd1
+          $failed = $false
+
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $file.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            )
+
+            if ($errors.Count -gt 0) {
+              $failed = $true
+              Write-Host "Syntax errors in $($file.FullName)" -ForegroundColor Red
+              $errors | ForEach-Object { Write-Host $_.Message -ForegroundColor Red }
+            }
+          }
+
+          if ($failed) { exit 1 }
+
+      - name: Validate JSON
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Recurse -File -Filter *.json
+          foreach ($file in $files) {
+            try {
+              [void](Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json)
+              Write-Host "OK $($file.FullName)"
+            }
+            catch {
+              Write-Error "Invalid JSON: $($file.FullName) - $($_.Exception.Message)"
+              exit 1
+            }
+          }
