@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "version": 4,
+  "final_space": true,
+  "console_title_template": "NEON DEV // {{.PWD}}",
+  "blocks": [
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "segments": [
+        { "type": "text", "style": "plain", "foreground": "#00C8FF", "template": "PS " },
+        { "type": "path", "style": "plain", "foreground": "#42D6FF", "options": { "style": "full" }, "template": "{{ .Path }}" },
+        { "type": "git", "style": "plain", "foreground": "#FF9F43", "template": "   <#FF9F43>{{ .HEAD }}</>{{ if .Staging.Changed }} <#59F2A9>+{{ .Staging.String }}</>{{ end }}{{ if .Working.Changed }} <#FF5C8A>*{{ .Working.String }}</>{{ end }}" },
+        { "type": "status", "style": "plain", "foreground": "#00C8FF", "foreground_templates": ["{{ if gt .Code 0 }}#FF5C8A{{ end }}"], "options": { "always_enabled": true }, "template": " ❯ " }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "right",
+      "segments": [
+        { "type": "executiontime", "style": "plain", "foreground": "#8BA6C7", "options": { "threshold": 500 }, "template": "{{ .FormattedMs }} " },
+        { "type": "time", "style": "plain", "foreground": "#C678DD", "options": { "time_format": "15:04" }, "template": "{{ .CurrentDate | date .Format }}" }
+      ]
+    }
+  ]
+}
