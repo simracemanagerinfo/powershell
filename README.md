@@ -27,6 +27,12 @@ cd powershell
 
 L'installer preferisce sempre operazioni **CurrentUser / user-level**. Se una dipendenza manca, chiede prima se tentare l'installazione per il solo utente corrente. Se questa fallisce, non tenta automaticamente un'installazione elevata.
 
+Per verificare l'ambiente dopo l'installazione:
+
+```powershell
+.\doctor.ps1
+```
+
 ## Il tuo profile non viene sovrascritto
 
 Se `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` esiste già, il suo contenuto viene preservato.
@@ -34,7 +40,8 @@ Se `Documents\PowerShell\Microsoft.PowerShell_profile.ps1` esiste già, il suo c
 L'installer:
 
 1. crea un backup sotto `%LOCALAPPDATA%\PowerShellCustomization\backups`;
-2. aggiunge o aggiorna soltanto il blocco compreso fra:
+2. rileva e mantiene la codifica del file esistente;
+3. aggiunge o aggiorna soltanto il blocco compreso fra:
 
 ```text
 # >>> powershell-customization managed >>>
