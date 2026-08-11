@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "version": 4,
+  "final_space": true,
+  "console_title_template": "STERN HUD // {{.PWD}}",
+  "blocks": [
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "segments": [
+        { "type": "text", "style": "plain", "foreground": "#67E8F9", "template": "PS " },
+        { "type": "path", "style": "plain", "foreground": "#67E8F9", "options": { "style": "full" }, "template": "{{ .Path }}" },
+        { "type": "kubectl", "style": "plain", "foreground": "#A78BFA", "template": "  ☸ <#A78BFA>{{ .Context }}</>{{ if .Namespace }}:<#67E8F9>{{ .Namespace }}</>{{ end }}" },
+        { "type": "docker", "style": "plain", "foreground": "#38BDF8", "template": "   {{ .Context }}" },
+        { "type": "git", "style": "plain", "foreground": "#FFD166", "template": "   {{ .HEAD }}{{ if .Working.Changed }} <#FF5C7A>*{{ .Working.String }}</>{{ end }}" },
+        { "type": "status", "style": "plain", "foreground": "#7861FF", "foreground_templates": ["{{ if gt .Code 0 }}#FF5C7A{{ end }}"], "options": { "always_enabled": true }, "template": " ❯ " }
+      ]
+    }
+  ]
+}
