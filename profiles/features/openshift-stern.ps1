@@ -4,14 +4,17 @@
 $configPath = if ($env:POWERSHELL_OPENSHIFT_CONFIG) {
     $env:POWERSHELL_OPENSHIFT_CONFIG
 }
+elseif ($env:LOCALAPPDATA) {
+    Join-Path $env:LOCALAPPDATA 'PowerShellCustomization\openshift.local.json'
+}
 else {
-    Join-Path $HOME '.config/powershell-personalization/openshift.local.json'
+    $configHome = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { Join-Path $HOME '.config' }
+    Join-Path $configHome 'powershell-customization/openshift.local.json'
 }
 
 function Get-OpenShiftCustomizationConfig {
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
         Write-Warning "Configurazione OpenShift non trovata: $configPath"
-        Write-Warning 'Copia config/openshift.example.json in un file locale e personalizzalo.'
         return $null
     }
     try {
