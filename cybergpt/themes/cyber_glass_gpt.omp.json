@@ -1,0 +1,48 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "version": 4,
+  "final_space": true,
+  "console_title_template": "CYBER GLASS // {{.PWD}}",
+  "blocks": [
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "segments": [
+        {
+          "type": "text",
+          "style": "plain",
+          "foreground": "#64FF9B",
+          "template": "PS "
+        },
+        {
+          "type": "path",
+          "style": "plain",
+          "foreground": "#7CFFD0",
+          "options": { "style": "full" },
+          "template": "{{ .Path }}"
+        },
+        {
+          "type": "git",
+          "style": "plain",
+          "foreground": "#FFD166",
+          "template": "   {{ .HEAD }}{{ if .Working.Changed }} <#FF6B6B>{{ .Working.String }}</>{{ end }}"
+        },
+        {
+          "type": "executiontime",
+          "style": "plain",
+          "foreground": "#62E7FF",
+          "options": { "threshold": 500 },
+          "template": "  {{ .FormattedMs }}"
+        },
+        {
+          "type": "status",
+          "style": "plain",
+          "foreground": "#64FF9B",
+          "foreground_templates": ["{{ if gt .Code 0 }}#FF6B6B{{ end }}"],
+          "options": { "always_enabled": true },
+          "template": " ❯ "
+        }
+      ]
+    }
+  ]
+}
