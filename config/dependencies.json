@@ -1,0 +1,62 @@
+{
+  "core": {
+    "applications": [
+      {
+        "name": "Windows Terminal",
+        "command": "wt.exe",
+        "wingetId": "Microsoft.WindowsTerminal",
+        "required": true
+      },
+      {
+        "name": "PowerShell 7",
+        "command": "pwsh.exe",
+        "wingetId": "Microsoft.PowerShell",
+        "required": true
+      },
+      {
+        "name": "Oh My Posh",
+        "command": "oh-my-posh.exe",
+        "wingetId": "JanDeDobbeleer.OhMyPosh",
+        "required": true
+      }
+    ],
+    "modules": [
+      {
+        "name": "Terminal-Icons",
+        "scope": "CurrentUser",
+        "required": true
+      },
+      {
+        "name": "PSReadLine",
+        "scope": "CurrentUser",
+        "required": true
+      }
+    ],
+    "fonts": [
+      {
+        "name": "MesloLGM Nerd Font",
+        "required": true,
+        "ohMyPoshName": "Meslo"
+      }
+    ]
+  },
+  "features": {
+    "OpenShiftStern": {
+      "applications": [
+        {
+          "name": "OpenShift CLI",
+          "command": "oc.exe",
+          "requiredWhenEnabled": true,
+          "installMethod": "user-supplied"
+        },
+        {
+          "name": "Stern",
+          "command": "stern.exe",
+          "wingetId": "stern.stern",
+          "requiredWhenEnabled": true,
+          "installMethod": "winget"
+        }
+      ]
+    }
+  }
+}
