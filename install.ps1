@@ -25,6 +25,7 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 $script:RuntimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
 $script:AssetRoot = Join-Path $script:RuntimeRoot 'assets'
 $script:LauncherRoot = Join-Path $script:RuntimeRoot 'launchers'
+$script:TerminalRuntimeRoot = Join-Path $script:RuntimeRoot 'terminal'
 $script:FragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
 $script:OptionsPath = Join-Path $script:RuntimeRoot 'install-options.json'
 $script:BinRoot = Join-Path $script:RuntimeRoot 'bin'
@@ -448,29 +449,39 @@ function Install-Graphics {
 
 function Install-WindowsTerminalFragment {
     New-Item -ItemType Directory -Path $script:FragmentRoot -Force | Out-Null
+    New-Item -ItemType Directory -Path $script:TerminalRuntimeRoot -Force | Out-Null
 
-    Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot 'cybergpt\Start-CyberProfile.ps1') -Destination (Join-Path $script:FragmentRoot 'Start-CyberProfile.ps1')
+    Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot 'cybergpt\Start-CyberProfile.ps1') -Destination (Join-Path $script:TerminalRuntimeRoot 'Start-CyberProfile.ps1')
 
-    $themeDir = Join-Path $script:FragmentRoot 'themes'
+    $themeDir = Join-Path $script:TerminalRuntimeRoot 'themes'
     New-Item -ItemType Directory -Path $themeDir -Force | Out-Null
     foreach ($theme in @('matrix_neon_gpt.omp.json', 'cyber_glass_gpt.omp.json', 'neon_dev_gpt.omp.json', 'stern_hud_gpt.omp.json')) {
         Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot "cybergpt\themes\$theme") -Destination (Join-Path $themeDir $theme)
     }
 
-    $shaderDir = Join-Path $script:FragmentRoot 'shaders'
+    $shaderDir = Join-Path $script:TerminalRuntimeRoot 'shaders'
     New-Item -ItemType Directory -Path $shaderDir -Force | Out-Null
     foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hlsl')) {
         Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot "cybergpt\shaders\$shader") -Destination (Join-Path $shaderDir $shader)
     }
 
     $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'windows-terminal\managed-settings.json'))
-    $fragmentJsonRoot = $script:FragmentRoot.Replace('\', '\\')
+    $terminalJsonRoot = $script:TerminalRuntimeRoot.Replace('\', '\\')
     $assetJsonRoot = $script:AssetRoot.Replace('\', '\\')
-    $rendered = $template.Replace('{{FRAGMENT_ROOT}}', $fragmentJsonRoot).Replace('{{ASSET_ROOT}}', $assetJsonRoot)
+    $rendered = $template.Replace('{{RUNTIME_ROOT}}', $terminalJsonRoot).Replace('{{ASSET_ROOT}}', $assetJsonRoot)
 
     $validated = $rendered | ConvertFrom-Json
     $json = ($validated | ConvertTo-Json -Depth 100) + [Environment]::NewLine
     [IO.File]::WriteAllText((Join-Path $script:FragmentRoot 'powershell-customization.json'), $json, [Text.UTF8Encoding]::new($false))
+
+    foreach ($legacyFragmentItem in @(
+        (Join-Path $script:FragmentRoot 'Start-CyberProfile.ps1'),
+        (Join-Path $script:FragmentRoot 'themes'),
+        (Join-Path $script:FragmentRoot 'shaders'))) {
+        if (Test-Path -LiteralPath $legacyFragmentItem) {
+            Remove-Item -LiteralPath $legacyFragmentItem -Recurse -Force
+        }
+    }
 }
 
 function Build-Launchers {

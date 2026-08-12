@@ -88,7 +88,7 @@ Il resto del profile non viene modificato.
 
 ## Windows Terminal
 
-I profili grafici vengono distribuiti tramite i **JSON Fragments** di Windows Terminal sotto:
+I profili grafici vengono distribuiti tramite i **JSON Fragments** di Windows Terminal sotto. La directory contiene soltanto il JSON del fragment; bootstrap, temi e shader restano nel runtime dell'applicazione:
 
 ```text
 %LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\PowerShellCustomization

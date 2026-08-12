@@ -9,6 +9,7 @@ $ErrorActionPreference = 'Continue'
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
 $assetRoot = Join-Path $runtimeRoot 'assets'
 $launcherRoot = Join-Path $runtimeRoot 'launchers'
+$terminalRuntimeRoot = Join-Path $runtimeRoot 'terminal'
 $fragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
 $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
 $profilePath = if ([string]::IsNullOrWhiteSpace($ProfilePathOverride)) {
@@ -79,6 +80,12 @@ if ($fragmentExists) {
         $fragmentJson = [IO.File]::ReadAllText($fragment) | ConvertFrom-Json
         $profileCount = @($fragmentJson.profiles).Count
         Add-Result -Name 'Profili Windows Terminal' -Status $(if ($profileCount -eq 4) { 'PASS' } else { 'FAIL' }) -Details "Profili rilevati: $profileCount"
+        $graphicalNames = @('Matrix Neon', 'Cyber Glass', 'Neon Dev', 'Stern HUD')
+        $powerShell7Profiles = @($fragmentJson.profiles | Where-Object {
+            [string]$_.name -in $graphicalNames -and [string]$_.commandline -match '^pwsh\.exe\s'
+        })
+        Add-Result -Name 'Profili grafici PowerShell 7' -Status $(if ($powerShell7Profiles.Count -eq $graphicalNames.Count) { 'PASS' } else { 'FAIL' }) `
+            -Details "Profili pwsh.exe: $($powerShell7Profiles.Count)/$($graphicalNames.Count)"
     }
     catch {
         Add-Result -Name 'Profili Windows Terminal' -Status 'FAIL' -Details $_.Exception.Message
@@ -89,7 +96,7 @@ else {
 }
 
 foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hlsl')) {
-    $path = Join-Path $fragmentRoot "shaders\$shader"
+    $path = Join-Path $terminalRuntimeRoot "shaders\$shader"
     Add-Result -Name "Shader $shader" -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
 }
 
@@ -129,6 +136,11 @@ if ($profileExists) {
         $profileText.Contains('# <<< powershell-customization managed <<<')
 }
 Add-Result -Name 'PowerShell 7 profile' -Status $(if ($profileManaged) { 'PASS' } elseif ($profileExists) { 'WARN' } else { 'FAIL' }) -Details $profilePath
+
+$unexpectedFragmentFiles = @(Get-ChildItem -LiteralPath $fragmentRoot -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -ne $fragment })
+Add-Result -Name 'Isolamento JSON Fragment' -Status $(if ($unexpectedFragmentFiles.Count -eq 0) { 'PASS' } else { 'FAIL' }) `
+    -Details $(if ($unexpectedFragmentFiles.Count -eq 0) { 'La directory contiene soltanto il fragment JSON' } else { $unexpectedFragmentFiles.FullName -join '; ' })
 
 $openShiftEnabled = $false
 if (Test-Path -LiteralPath $optionsPath -PathType Leaf) {
