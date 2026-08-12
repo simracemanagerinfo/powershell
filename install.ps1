@@ -611,7 +611,7 @@ function Install-LauncherShortcuts {
         $shortcutPath = Join-Path $startMenuRoot "$name.lnk"
         $shortcut = $shell.CreateShortcut($shortcutPath)
         $shortcut.TargetPath = $exe
-        $shortcut.WorkingDirectory = $script:LauncherRoot
+        $shortcut.WorkingDirectory = [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)
         $shortcut.IconLocation = "$exe,0"
         $shortcut.Description = "PowerShell Customization - $name"
         $shortcut.Save()

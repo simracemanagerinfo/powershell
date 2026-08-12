@@ -96,6 +96,8 @@ I profili grafici vengono aggiunti direttamente al `settings.json` dell'installa
 
 Bootstrap, temi e shader vengono installati separatamente in `%LOCALAPPDATA%\PowerShellCustomization\terminal`.
 
+Tutti i launcher aprono PowerShell nella cartella personale dell'utente (`%USERPROFILE%`), mai nella directory applicativa sotto AppData.
+
 ## OpenShift / Stern opzionale
 
 Il **tema grafico Stern HUD e il relativo EXE vengono sempre installati**. Il supporto operativo OpenShift/Stern rimane invece opzionale.

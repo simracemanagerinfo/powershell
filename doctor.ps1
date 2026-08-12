@@ -88,6 +88,9 @@ if ($terminalSettings) {
         Add-Result -Name 'Profili Windows Terminal' -Status $(if ($powerShell7Profiles.Count -eq 4) { 'PASS' } else { 'FAIL' }) -Details "Profili rilevati: $($powerShell7Profiles.Count)/4"
         Add-Result -Name 'Profili grafici PowerShell 7' -Status $(if ($powerShell7Profiles.Count -eq $graphicalNames.Count) { 'PASS' } else { 'FAIL' }) `
             -Details "Profili pwsh.exe: $($powerShell7Profiles.Count)/$($graphicalNames.Count)"
+        $homeProfiles = @($powerShell7Profiles | Where-Object { [string]$_.startingDirectory -eq '%USERPROFILE%' })
+        Add-Result -Name 'Directory iniziale profili' -Status $(if ($homeProfiles.Count -eq $graphicalNames.Count) { 'PASS' } else { 'FAIL' }) `
+            -Details "Profili nella home utente: $($homeProfiles.Count)/$($graphicalNames.Count)"
     }
     catch {
         Add-Result -Name 'Profili Windows Terminal' -Status 'FAIL' -Details $_.Exception.Message
