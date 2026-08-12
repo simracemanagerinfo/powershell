@@ -10,7 +10,11 @@ $runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
 $assetRoot = Join-Path $runtimeRoot 'assets'
 $launcherRoot = Join-Path $runtimeRoot 'launchers'
 $terminalRuntimeRoot = Join-Path $runtimeRoot 'terminal'
-$fragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
+$terminalSettingsCandidates = @(
+    (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
+    (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json'),
+    (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
+)
 $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
 $profilePath = if ([string]::IsNullOrWhiteSpace($ProfilePathOverride)) {
     Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
@@ -72,18 +76,16 @@ foreach ($registryPath in @(
 }
 Add-Result -Name 'MesloLGM Nerd Font' -Status $(if ($fontFound) { 'PASS' } else { 'WARN' }) -Details $(if ($fontFound) { 'Installato' } else { 'Non rilevato' })
 
-$fragment = Join-Path $fragmentRoot 'powershell-customization.json'
-$fragmentExists = Test-Path -LiteralPath $fragment -PathType Leaf
-Add-Result -Name 'Windows Terminal fragment' -Status $(if ($fragmentExists) { 'PASS' } else { 'FAIL' }) -Details $fragment
-if ($fragmentExists) {
+$terminalSettings = $terminalSettingsCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+Add-Result -Name 'Windows Terminal settings' -Status $(if ($terminalSettings) { 'PASS' } else { 'FAIL' }) -Details $terminalSettings
+if ($terminalSettings) {
     try {
-        $fragmentJson = [IO.File]::ReadAllText($fragment) | ConvertFrom-Json
-        $profileCount = @($fragmentJson.profiles).Count
-        Add-Result -Name 'Profili Windows Terminal' -Status $(if ($profileCount -eq 4) { 'PASS' } else { 'FAIL' }) -Details "Profili rilevati: $profileCount"
+        $terminalJson = [IO.File]::ReadAllText($terminalSettings) | ConvertFrom-Json
         $graphicalNames = @('Matrix Neon', 'Cyber Glass', 'Neon Dev', 'Stern HUD')
-        $powerShell7Profiles = @($fragmentJson.profiles | Where-Object {
+        $powerShell7Profiles = @($terminalJson.profiles.list | Where-Object {
             [string]$_.name -in $graphicalNames -and [string]$_.commandline -match '^pwsh\.exe\s'
         })
+        Add-Result -Name 'Profili Windows Terminal' -Status $(if ($powerShell7Profiles.Count -eq 4) { 'PASS' } else { 'FAIL' }) -Details "Profili rilevati: $($powerShell7Profiles.Count)/4"
         Add-Result -Name 'Profili grafici PowerShell 7' -Status $(if ($powerShell7Profiles.Count -eq $graphicalNames.Count) { 'PASS' } else { 'FAIL' }) `
             -Details "Profili pwsh.exe: $($powerShell7Profiles.Count)/$($graphicalNames.Count)"
     }
@@ -92,7 +94,7 @@ if ($fragmentExists) {
     }
 }
 else {
-    Add-Result -Name 'Profili Windows Terminal' -Status 'FAIL' -Details 'Fragment non disponibile'
+    Add-Result -Name 'Profili Windows Terminal' -Status 'FAIL' -Details 'settings.json non disponibile'
 }
 
 foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hlsl')) {
@@ -136,11 +138,6 @@ if ($profileExists) {
         $profileText.Contains('# <<< powershell-customization managed <<<')
 }
 Add-Result -Name 'PowerShell 7 profile' -Status $(if ($profileManaged) { 'PASS' } elseif ($profileExists) { 'WARN' } else { 'FAIL' }) -Details $profilePath
-
-$unexpectedFragmentFiles = @(Get-ChildItem -LiteralPath $fragmentRoot -Recurse -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -ne $fragment })
-Add-Result -Name 'Isolamento JSON Fragment' -Status $(if ($unexpectedFragmentFiles.Count -eq 0) { 'PASS' } else { 'FAIL' }) `
-    -Details $(if ($unexpectedFragmentFiles.Count -eq 0) { 'La directory contiene soltanto il fragment JSON' } else { $unexpectedFragmentFiles.FullName -join '; ' })
 
 $openShiftEnabled = $false
 if (Test-Path -LiteralPath $optionsPath -PathType Leaf) {

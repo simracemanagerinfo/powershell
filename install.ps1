@@ -13,7 +13,23 @@ param(
 
     [Parameter(DontShow)]
     [AllowNull()]
-    [string[]]$LaunchersOverride
+    [string[]]$LaunchersOverride,
+
+    [Parameter(DontShow)]
+    [AllowNull()]
+    [string]$RuntimeRootOverride,
+
+    [Parameter(DontShow)]
+    [AllowNull()]
+    [string]$TerminalSettingsPathOverride,
+
+    [Parameter(DontShow)]
+    [AllowNull()]
+    [string]$FragmentRootOverride,
+
+    [Parameter(DontShow)]
+    [AllowNull()]
+    [string]$StartMenuRootOverride
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,11 +38,17 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     throw 'Questo install.ps1 configura Windows Terminal ed è attualmente supportato solo su Windows.'
 }
 
-$script:RuntimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+$script:RuntimeRoot = if ([string]::IsNullOrWhiteSpace($RuntimeRootOverride)) {
+    Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+}
+else { [IO.Path]::GetFullPath($RuntimeRootOverride) }
 $script:AssetRoot = Join-Path $script:RuntimeRoot 'assets'
 $script:LauncherRoot = Join-Path $script:RuntimeRoot 'launchers'
 $script:TerminalRuntimeRoot = Join-Path $script:RuntimeRoot 'terminal'
-$script:FragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
+$script:FragmentRoot = if ([string]::IsNullOrWhiteSpace($FragmentRootOverride)) {
+    Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
+}
+else { [IO.Path]::GetFullPath($FragmentRootOverride) }
 $script:OptionsPath = Join-Path $script:RuntimeRoot 'install-options.json'
 $script:BinRoot = Join-Path $script:RuntimeRoot 'bin'
 $script:Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
@@ -447,8 +469,23 @@ function Install-Graphics {
     Copy-Item -LiteralPath $initialBackground -Destination (Join-Path $script:AssetRoot 'backgrounds\current.png') -Force
 }
 
-function Install-WindowsTerminalFragment {
-    New-Item -ItemType Directory -Path $script:FragmentRoot -Force | Out-Null
+function Resolve-WindowsTerminalSettingsPath {
+    if (-not [string]::IsNullOrWhiteSpace($TerminalSettingsPathOverride)) {
+        return [IO.Path]::GetFullPath($TerminalSettingsPathOverride)
+    }
+
+    $candidates = @(
+        (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
+        (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json'),
+        (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
+    )
+    $existing = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
+    if ($existing) { return $existing }
+
+    throw 'settings.json di Windows Terminal non trovato. Avvia Windows Terminal almeno una volta e rilancia install.ps1.'
+}
+
+function Install-WindowsTerminalProfiles {
     New-Item -ItemType Directory -Path $script:TerminalRuntimeRoot -Force | Out-Null
 
     Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot 'cybergpt\Start-CyberProfile.ps1') -Destination (Join-Path $script:TerminalRuntimeRoot 'Start-CyberProfile.ps1')
@@ -471,17 +508,69 @@ function Install-WindowsTerminalFragment {
     $rendered = $template.Replace('{{RUNTIME_ROOT}}', $terminalJsonRoot).Replace('{{ASSET_ROOT}}', $assetJsonRoot)
 
     $validated = $rendered | ConvertFrom-Json
-    $json = ($validated | ConvertTo-Json -Depth 100) + [Environment]::NewLine
-    [IO.File]::WriteAllText((Join-Path $script:FragmentRoot 'powershell-customization.json'), $json, [Text.UTF8Encoding]::new($false))
 
-    foreach ($legacyFragmentItem in @(
-        (Join-Path $script:FragmentRoot 'Start-CyberProfile.ps1'),
-        (Join-Path $script:FragmentRoot 'themes'),
-        (Join-Path $script:FragmentRoot 'shaders'))) {
-        if (Test-Path -LiteralPath $legacyFragmentItem) {
-            Remove-Item -LiteralPath $legacyFragmentItem -Recurse -Force
+    $settingsPath = Resolve-WindowsTerminalSettingsPath
+    $settingsDirectory = Split-Path -Parent $settingsPath
+    New-Item -ItemType Directory -Path $settingsDirectory -Force | Out-Null
+    $settings = if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
+        [IO.File]::ReadAllText($settingsPath) | ConvertFrom-Json
+    }
+    else {
+        [pscustomobject]@{}
+    }
+
+    if (-not $settings.PSObject.Properties['profiles'] -or $settings.profiles -is [array]) {
+        $legacyProfiles = if ($settings.PSObject.Properties['profiles']) { @($settings.profiles) } else { @() }
+        if ($settings.PSObject.Properties['profiles']) { $settings.PSObject.Properties.Remove('profiles') }
+        $settings | Add-Member -NotePropertyName profiles -NotePropertyValue ([pscustomobject]@{ list = $legacyProfiles })
+    }
+    elseif (-not $settings.profiles.PSObject.Properties['list']) {
+        $settings.profiles | Add-Member -NotePropertyName list -NotePropertyValue @()
+    }
+    if (-not $settings.PSObject.Properties['schemes']) {
+        $settings | Add-Member -NotePropertyName schemes -NotePropertyValue @()
+    }
+
+    $managedGuids = @($validated.profiles | ForEach-Object { [string]$_.guid })
+    $managedNames = @(
+        'Matrix Neon', 'Cyber Glass', 'Neon Dev', 'Stern HUD',
+        'matrix_neon_gpt', 'cyber_glass_gpt', 'neon_dev_gpt', 'stern_hud_gpt'
+    )
+    $keptProfiles = @($settings.profiles.list | Where-Object {
+            [string]$_.guid -notin $managedGuids -and [string]$_.name -notin $managedNames
+        })
+    $managedSchemeNames = @($validated.schemes | ForEach-Object { [string]$_.name })
+    $keptSchemes = @($settings.schemes | Where-Object { [string]$_.name -notin $managedSchemeNames })
+    $settings.profiles.list = @($keptProfiles) + @($validated.profiles)
+    $settings.schemes = @($keptSchemes) + @($validated.schemes)
+
+    if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
+        $backupPath = "$settingsPath.powershell-customization-backup-$($script:Timestamp)"
+        Copy-Item -LiteralPath $settingsPath -Destination $backupPath -Force
+        Write-Host "Backup Windows Terminal: $backupPath" -ForegroundColor Cyan
+    }
+
+    $json = ($settings | ConvertTo-Json -Depth 100) + [Environment]::NewLine
+    $temporaryPath = "$settingsPath.powershell-customization-new-$PID"
+    [IO.File]::WriteAllText($temporaryPath, $json, [Text.UTF8Encoding]::new($false))
+    try {
+        $written = [IO.File]::ReadAllText($temporaryPath) | ConvertFrom-Json
+        if (@($written.profiles.list | Where-Object { [string]$_.guid -in $managedGuids }).Count -ne $managedGuids.Count) {
+            throw 'Verifica dei profili Windows Terminal non riuscita.'
+        }
+        Move-Item -LiteralPath $temporaryPath -Destination $settingsPath -Force
+    }
+    finally {
+        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $temporaryPath -Force
         }
     }
+
+    if (Test-Path -LiteralPath $script:FragmentRoot -PathType Container) {
+        Remove-Item -LiteralPath $script:FragmentRoot -Recurse -Force
+    }
+
+    $script:TerminalSettingsPath = $settingsPath
 }
 
 function Build-Launchers {
@@ -501,7 +590,10 @@ function Build-Launchers {
 function Install-LauncherShortcuts {
     param([Parameter(Mandatory)][string[]]$Names)
 
-    $startMenuRoot = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\PowerShell Customization'
+    $startMenuRoot = if ([string]::IsNullOrWhiteSpace($StartMenuRootOverride)) {
+        Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\PowerShell Customization'
+    }
+    else { [IO.Path]::GetFullPath($StartMenuRootOverride) }
     New-Item -ItemType Directory -Path $startMenuRoot -Force | Out-Null
     $shell = New-Object -ComObject WScript.Shell
 
@@ -545,7 +637,7 @@ if (-not $SkipDependencies) {
 
 Install-RuntimeFiles -Options $options
 Install-Graphics
-Install-WindowsTerminalFragment
+Install-WindowsTerminalProfiles
 Build-Launchers -Names $options.Launchers
 Install-LauncherShortcuts -Names $options.Launchers
 
@@ -562,7 +654,7 @@ Write-Host ''
 Write-Host 'Installazione completata.' -ForegroundColor Green
 Write-Host "Profilo PowerShell 7: $powerShell7Profile"
 Write-Host "Asset PNG/ICO: $script:AssetRoot"
-Write-Host "Windows Terminal fragments: $script:FragmentRoot"
+Write-Host "Windows Terminal settings: $script:TerminalSettingsPath"
 Write-Host "Launcher EXE: $script:LauncherRoot"
 Write-Host "Creati: $((@($options.Launchers) | ForEach-Object { "$_.exe" }) -join ', ')" -ForegroundColor Green
 Write-Host 'Il contenuto preesistente del profilo PowerShell non viene sovrascritto.' -ForegroundColor Cyan

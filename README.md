@@ -88,13 +88,13 @@ Il resto del profile non viene modificato.
 
 ## Windows Terminal
 
-I profili grafici vengono distribuiti tramite i **JSON Fragments** di Windows Terminal sotto. La directory contiene soltanto il JSON del fragment; bootstrap, temi e shader restano nel runtime dell'applicazione:
+I profili grafici vengono aggiunti direttamente al `settings.json` dell'installazione di Windows Terminal rilevata. L'installer crea prima un backup con timestamp e sostituisce esclusivamente i quattro profili e gli schemi colore gestiti dal progetto; gli altri profili e le altre preferenze restano invariati.
 
 ```text
-%LOCALAPPDATA%\Microsoft\Windows Terminal\Fragments\PowerShellCustomization
+%LOCALAPPDATA%\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json
 ```
 
-Non viene sostituito il `settings.json` personale dell'utente.
+Bootstrap, temi e shader vengono installati separatamente in `%LOCALAPPDATA%\PowerShellCustomization\terminal`.
 
 ## OpenShift / Stern opzionale
 
@@ -139,4 +139,4 @@ I file `*.local.ps1` e `*.local.json` sono ignorati da Git.
 
 ## Portabilità
 
-La parte PowerShell / Oh My Posh è pensata per essere portabile anche su macOS e Linux. Le integrazioni specifiche di Windows Terminal, come JSON Fragments, launcher Win32 e pixel shader, sono invece Windows-specifiche e richiederanno un adattatore per il terminale scelto sugli altri sistemi.
+La parte PowerShell / Oh My Posh è pensata per essere portabile anche su macOS e Linux. Le integrazioni specifiche di Windows Terminal, come profili, launcher Win32 e pixel shader, sono invece Windows-specifiche e richiederanno un adattatore per il terminale scelto sugli altri sistemi.
