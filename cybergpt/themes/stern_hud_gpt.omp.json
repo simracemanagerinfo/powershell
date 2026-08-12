@@ -12,8 +12,15 @@
         { "type": "path", "style": "plain", "foreground": "#67E8F9", "options": { "style": "full" }, "template": "{{ .Path }}" },
         { "type": "kubectl", "style": "plain", "foreground": "#A78BFA", "template": "  ☸ <#A78BFA>{{ .Context }}</>{{ if .Namespace }}:<#67E8F9>{{ .Namespace }}</>{{ end }}" },
         { "type": "docker", "style": "plain", "foreground": "#38BDF8", "template": "   {{ .Context }}" },
-        { "type": "git", "style": "plain", "foreground": "#FFD166", "template": "   {{ .HEAD }}{{ if .Working.Changed }} <#FF5C7A>*{{ .Working.String }}</>{{ end }}" },
-        { "type": "status", "style": "plain", "foreground": "#7861FF", "foreground_templates": ["{{ if gt .Code 0 }}#FF5C7A{{ end }}"], "options": { "always_enabled": true }, "template": " ❯ " }
+        { "type": "git", "style": "plain", "foreground": "#FFD166", "template": "   {{ .HEAD }}{{ if .Working.Changed }} <#FF5C7A>*{{ .Working.String }}</>{{ end }}" }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "newline": true,
+      "segments": [
+        { "type": "status", "style": "plain", "foreground": "#7861FF", "foreground_templates": ["{{ if gt .Code 0 }}#FF5C7A{{ end }}"], "options": { "always_enabled": true }, "template": "❯ " }
       ]
     }
   ]
