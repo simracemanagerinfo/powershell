@@ -32,9 +32,11 @@ id_ed25519
 
 # Generated/runtime CyberGPT files
 cybergpt/backgrounds/current.png
+assets/backgrounds/current.png
 cybergpt/backgrounds/.last-background*
 
 # Build/system output
+*.exe
 *.obj
 *.o
 *.res

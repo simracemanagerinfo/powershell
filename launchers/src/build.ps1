@@ -6,6 +6,10 @@ param(
     [Parameter(Mandatory)]
     [string]$AssetRoot,
 
+    [Parameter()]
+    [ValidateSet('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD')]
+    [string[]]$Launchers = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD'),
+
     [Parameter(DontShow)]
     [switch]$ForcePortableToolchain
 )
@@ -99,7 +103,7 @@ function New-ResourceScript {
     [IO.File]::WriteAllText($Path, $content, [Text.UTF8Encoding]::new($false))
 }
 
-$launchers = @(
+$launcherDefinitions = @(
     @{ Name = 'Matrix GPT'; Source = 'Matrix GPT.c'; Icon = 'matrix_gpt.ico' },
     @{ Name = 'Cyber Glass'; Source = 'Cyber Glass.c'; Icon = 'matrix_gpt_clear.ico' },
     @{ Name = 'Neon Dev'; Source = 'Neon Dev.c'; Icon = 'svi_gpt_original.ico' },
@@ -109,14 +113,25 @@ $launchers = @(
 $manifestPath = Join-Path $PSScriptRoot 'launcher.manifest'
 $iconRoot = Join-Path $AssetRoot 'icons'
 $toolchain = Get-BuildToolchain
+$selectedDefinitions = @($launcherDefinitions | Where-Object { $_.Name -in $Launchers })
+
+if ($selectedDefinitions.Count -eq 0) {
+    throw 'Seleziona almeno un launcher da compilare.'
+}
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
+foreach ($definition in $launcherDefinitions) {
+    $previousOutput = Join-Path $OutputDirectory "$($definition.Name).exe"
+    if (Test-Path -LiteralPath $previousOutput -PathType Leaf) {
+        Remove-Item -LiteralPath $previousOutput -Force
+    }
+}
 $tempRoot = Join-Path $env:TEMP "powershell-customization-launchers-$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
 
 Push-Location $PSScriptRoot
 try {
-    foreach ($launcher in $launchers) {
+    foreach ($launcher in $selectedDefinitions) {
         $source = Join-Path $PSScriptRoot $launcher.Source
         $icon = Join-Path $iconRoot $launcher.Icon
         $executable = Join-Path $OutputDirectory "$($launcher.Name).exe"
@@ -175,8 +190,8 @@ finally {
 }
 
 $built = @(Get-ChildItem -LiteralPath $OutputDirectory -File -Filter '*.exe' | Sort-Object Name)
-if ($built.Count -ne 4) {
-    throw "Build incompleta: attesi 4 EXE, trovati $($built.Count)."
+if ($built.Count -ne $selectedDefinitions.Count) {
+    throw "Build incompleta: attesi $($selectedDefinitions.Count) EXE, trovati $($built.Count)."
 }
 
 $built | Select-Object Name, Length, @{ Name = 'SHA256'; Expression = { (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash } }

@@ -9,7 +9,11 @@ param(
 
     [Parameter(DontShow)]
     [AllowNull()]
-    [string]$ProfilePathOverride
+    [string]$ProfilePathOverride,
+
+    [Parameter(DontShow)]
+    [AllowNull()]
+    [string[]]$LaunchersOverride
 )
 
 $ErrorActionPreference = 'Stop'
@@ -25,6 +29,7 @@ $script:FragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\F
 $script:OptionsPath = Join-Path $script:RuntimeRoot 'install-options.json'
 $script:BinRoot = Join-Path $script:RuntimeRoot 'bin'
 $script:Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+$script:LauncherNames = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD')
 
 function Read-YesNo {
     param(
@@ -42,6 +47,39 @@ function Read-YesNo {
             '^(?i:n|no)$' { return $false }
             default { Write-Host 'Rispondi S oppure N.' -ForegroundColor Yellow }
         }
+    }
+}
+
+function Resolve-LauncherSelection {
+    param([AllowNull()][string[]]$Names)
+
+    $resolved = @()
+    foreach ($name in @($Names)) {
+        $canonical = $script:LauncherNames | Where-Object { $_ -ieq $name } | Select-Object -First 1
+        if (-not $canonical) {
+            throw "Launcher non riconosciuto: $name. Valori ammessi: $($script:LauncherNames -join ', ')."
+        }
+        if ($canonical -notin $resolved) {
+            $resolved += $canonical
+        }
+    }
+    if ($resolved.Count -eq 0) {
+        throw 'Seleziona almeno un launcher.'
+    }
+    return $resolved
+}
+
+function Read-LauncherSelection {
+    while ($true) {
+        Write-Host ''
+        Write-Host 'Quali launcher EXE vuoi creare? Premi Invio per accettare S.' -ForegroundColor Cyan
+        $selected = @($script:LauncherNames | Where-Object {
+                Read-YesNo -Prompt "  $_ [S/N]" -Default $true
+            })
+        if ($selected.Count -gt 0) {
+            return $selected
+        }
+        Write-Host 'Devi selezionare almeno un launcher.' -ForegroundColor Yellow
     }
 }
 
@@ -211,22 +249,33 @@ function Ensure-OcClient {
 }
 
 function Get-InstallOptions {
-    if ($null -ne $OpenShiftSternOverride) {
-        return [pscustomobject]@{ OpenShiftStern = [bool]$OpenShiftSternOverride }
-    }
-
-    if (-not $Reconfigure -and (Test-Path -LiteralPath $script:OptionsPath -PathType Leaf)) {
+    if (-not $Reconfigure -and $null -eq $OpenShiftSternOverride -and $null -eq $LaunchersOverride -and
+        (Test-Path -LiteralPath $script:OptionsPath -PathType Leaf)) {
         try {
             $saved = [IO.File]::ReadAllText($script:OptionsPath) | ConvertFrom-Json
-            if ($saved.PSObject.Properties['OpenShiftStern']) {
-                return [pscustomobject]@{ OpenShiftStern = [bool]$saved.OpenShiftStern }
+            if ($saved.PSObject.Properties['OpenShiftStern'] -and $saved.PSObject.Properties['Launchers']) {
+                return [pscustomobject]@{
+                    OpenShiftStern = [bool]$saved.OpenShiftStern
+                    Launchers      = @(Resolve-LauncherSelection -Names @($saved.Launchers))
+                }
             }
         }
         catch { }
     }
 
     return [pscustomobject]@{
-        OpenShiftStern = Read-YesNo -Prompt 'Ti serve il supporto OpenShift / Stern? [S/N]' -Default $false
+        OpenShiftStern = if ($null -ne $OpenShiftSternOverride) {
+            [bool]$OpenShiftSternOverride
+        }
+        else {
+            Read-YesNo -Prompt 'Ti serve il supporto OpenShift / Stern? [S/N]' -Default $false
+        }
+        Launchers = if ($null -ne $LaunchersOverride) {
+            @(Resolve-LauncherSelection -Names $LaunchersOverride)
+        }
+        else {
+            @(Read-LauncherSelection)
+        }
     }
 }
 
@@ -234,7 +283,10 @@ function Save-InstallOptions {
     param([Parameter(Mandatory)]$Options)
 
     New-Item -ItemType Directory -Path $script:RuntimeRoot -Force | Out-Null
-    $json = ([pscustomobject]@{ OpenShiftStern = [bool]$Options.OpenShiftStern } | ConvertTo-Json) + [Environment]::NewLine
+    $json = ([pscustomobject]@{
+            OpenShiftStern = [bool]$Options.OpenShiftStern
+            Launchers      = @($Options.Launchers)
+        } | ConvertTo-Json) + [Environment]::NewLine
     [IO.File]::WriteAllText($script:OptionsPath, $json, [Text.UTF8Encoding]::new($false))
 }
 
@@ -363,8 +415,35 @@ function Install-RuntimeFiles {
 }
 
 function Install-Graphics {
-    $generator = Join-Path $PSScriptRoot 'assets\New-PublicAssets.ps1'
-    & $generator -OutputRoot $script:AssetRoot
+    $sourceRoot = Join-Path $PSScriptRoot 'assets'
+    $requiredAssets = @(
+        'backgrounds\pool\01_roma_vaticano_neon.png',
+        'backgrounds\pool\02_simrace_pitlane_neon.png',
+        'backgrounds\pool\03_roma_colosseo_future.png',
+        'backgrounds\pool\04_simrace_garage_future.png',
+        'backgrounds\pool\05_roma_colosseo_rain.png',
+        'backgrounds\pool\06_simrace_night_race.png',
+        'icons\matrix_gpt.ico',
+        'icons\matrix_gpt_clear.ico',
+        'icons\svi_gpt_original.ico',
+        'icons\stern_logs.ico',
+        'watermarks\svi_gpt.png',
+        'watermarks\stern_logs.png'
+    )
+
+    foreach ($relativePath in $requiredAssets) {
+        $source = Join-Path $sourceRoot $relativePath
+        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+            throw "Asset versionato mancante: $source"
+        }
+
+        $destination = Join-Path $script:AssetRoot $relativePath
+        New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+        Copy-Item -LiteralPath $source -Destination $destination -Force
+    }
+
+    $initialBackground = Join-Path $script:AssetRoot 'backgrounds\pool\01_roma_vaticano_neon.png'
+    Copy-Item -LiteralPath $initialBackground -Destination (Join-Path $script:AssetRoot 'backgrounds\current.png') -Force
 }
 
 function Install-WindowsTerminalFragment {
@@ -395,12 +474,13 @@ function Install-WindowsTerminalFragment {
 }
 
 function Build-Launchers {
-    $buildScript = Join-Path $PSScriptRoot 'launchers\src\build.ps1'
-    & $buildScript -OutputDirectory $script:LauncherRoot -AssetRoot $script:AssetRoot | Out-Host
+    param([Parameter(Mandatory)][string[]]$Names)
 
-    $expected = @('Matrix GPT.exe', 'Cyber Glass.exe', 'Neon Dev.exe', 'Stern HUD.exe')
-    foreach ($name in $expected) {
-        $path = Join-Path $script:LauncherRoot $name
+    $buildScript = Join-Path $PSScriptRoot 'launchers\src\build.ps1'
+    & $buildScript -OutputDirectory $script:LauncherRoot -AssetRoot $script:AssetRoot -Launchers $Names | Out-Host
+
+    foreach ($name in $Names) {
+        $path = Join-Path $script:LauncherRoot "$name.exe"
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "Launcher non prodotto: $path"
         }
@@ -408,11 +488,22 @@ function Build-Launchers {
 }
 
 function Install-LauncherShortcuts {
+    param([Parameter(Mandatory)][string[]]$Names)
+
     $startMenuRoot = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\PowerShell Customization'
     New-Item -ItemType Directory -Path $startMenuRoot -Force | Out-Null
     $shell = New-Object -ComObject WScript.Shell
 
-    foreach ($name in @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD')) {
+    foreach ($knownName in $script:LauncherNames) {
+        if ($knownName -notin $Names) {
+            $obsoleteShortcut = Join-Path $startMenuRoot "$knownName.lnk"
+            if (Test-Path -LiteralPath $obsoleteShortcut -PathType Leaf) {
+                Remove-Item -LiteralPath $obsoleteShortcut -Force
+            }
+        }
+    }
+
+    foreach ($name in $Names) {
         $exe = Join-Path $script:LauncherRoot "$name.exe"
         $shortcutPath = Join-Path $startMenuRoot "$name.lnk"
         $shortcut = $shell.CreateShortcut($shortcutPath)
@@ -444,8 +535,8 @@ if (-not $SkipDependencies) {
 Install-RuntimeFiles -Options $options
 Install-Graphics
 Install-WindowsTerminalFragment
-Build-Launchers
-Install-LauncherShortcuts
+Build-Launchers -Names $options.Launchers
+Install-LauncherShortcuts -Names $options.Launchers
 
 $powerShell7Profile = if (-not [string]::IsNullOrWhiteSpace($ProfilePathOverride)) {
     [IO.Path]::GetFullPath($ProfilePathOverride)
@@ -462,5 +553,5 @@ Write-Host "Profilo PowerShell 7: $powerShell7Profile"
 Write-Host "Asset PNG/ICO: $script:AssetRoot"
 Write-Host "Windows Terminal fragments: $script:FragmentRoot"
 Write-Host "Launcher EXE: $script:LauncherRoot"
-Write-Host 'Creati: Matrix GPT.exe, Cyber Glass.exe, Neon Dev.exe, Stern HUD.exe' -ForegroundColor Green
+Write-Host "Creati: $((@($options.Launchers) | ForEach-Object { "$_.exe" }) -join ', ')" -ForegroundColor Green
 Write-Host 'Il contenuto preesistente del profilo PowerShell non viene sovrascritto.' -ForegroundColor Cyan

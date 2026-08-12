@@ -1,5 +1,9 @@
 [CmdletBinding()]
-param()
+param(
+    [Parameter(DontShow)]
+    [AllowNull()]
+    [string]$ProfilePathOverride
+)
 
 $ErrorActionPreference = 'Continue'
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
@@ -7,8 +11,27 @@ $assetRoot = Join-Path $runtimeRoot 'assets'
 $launcherRoot = Join-Path $runtimeRoot 'launchers'
 $fragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
 $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
-$profilePath = Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+$profilePath = if ([string]::IsNullOrWhiteSpace($ProfilePathOverride)) {
+    Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
+}
+else {
+    [IO.Path]::GetFullPath($ProfilePathOverride)
+}
 $optionsPath = Join-Path $runtimeRoot 'install-options.json'
+$launcherNames = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD')
+$selectedLaunchers = @($launcherNames)
+if (Test-Path -LiteralPath $optionsPath -PathType Leaf) {
+    try {
+        $savedOptions = [IO.File]::ReadAllText($optionsPath) | ConvertFrom-Json
+        if ($savedOptions.PSObject.Properties['Launchers']) {
+            $candidateLaunchers = @($savedOptions.Launchers | Where-Object { $_ -in $launcherNames } | Select-Object -Unique)
+            if ($candidateLaunchers.Count -gt 0) {
+                $selectedLaunchers = $candidateLaunchers
+            }
+        }
+    }
+    catch { }
+}
 
 $results = New-Object System.Collections.Generic.List[object]
 
@@ -49,7 +72,26 @@ foreach ($registryPath in @(
 Add-Result -Name 'MesloLGM Nerd Font' -Status $(if ($fontFound) { 'PASS' } else { 'WARN' }) -Details $(if ($fontFound) { 'Installato' } else { 'Non rilevato' })
 
 $fragment = Join-Path $fragmentRoot 'powershell-customization.json'
-Add-Result -Name 'Windows Terminal fragment' -Status $(if (Test-Path -LiteralPath $fragment -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $fragment
+$fragmentExists = Test-Path -LiteralPath $fragment -PathType Leaf
+Add-Result -Name 'Windows Terminal fragment' -Status $(if ($fragmentExists) { 'PASS' } else { 'FAIL' }) -Details $fragment
+if ($fragmentExists) {
+    try {
+        $fragmentJson = [IO.File]::ReadAllText($fragment) | ConvertFrom-Json
+        $profileCount = @($fragmentJson.profiles).Count
+        Add-Result -Name 'Profili Windows Terminal' -Status $(if ($profileCount -eq 4) { 'PASS' } else { 'FAIL' }) -Details "Profili rilevati: $profileCount"
+    }
+    catch {
+        Add-Result -Name 'Profili Windows Terminal' -Status 'FAIL' -Details $_.Exception.Message
+    }
+}
+else {
+    Add-Result -Name 'Profili Windows Terminal' -Status 'FAIL' -Details 'Fragment non disponibile'
+}
+
+foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hlsl')) {
+    $path = Join-Path $fragmentRoot "shaders\$shader"
+    Add-Result -Name "Shader $shader" -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
+}
 
 foreach ($asset in @(
     'icons\matrix_gpt.ico',
@@ -58,14 +100,25 @@ foreach ($asset in @(
     'icons\stern_logs.ico',
     'watermarks\svi_gpt.png',
     'watermarks\stern_logs.png',
+    'backgrounds\pool\01_roma_vaticano_neon.png',
+    'backgrounds\pool\02_simrace_pitlane_neon.png',
+    'backgrounds\pool\03_roma_colosseo_future.png',
+    'backgrounds\pool\04_simrace_garage_future.png',
+    'backgrounds\pool\05_roma_colosseo_rain.png',
+    'backgrounds\pool\06_simrace_night_race.png',
     'backgrounds\current.png')) {
     $path = Join-Path $assetRoot $asset
     Add-Result -Name "Asset $asset" -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
 }
 
-foreach ($launcher in @('Matrix GPT.exe', 'Cyber Glass.exe', 'Neon Dev.exe', 'Stern HUD.exe')) {
-    $path = Join-Path $launcherRoot $launcher
-    Add-Result -Name $launcher -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
+foreach ($launcher in $launcherNames) {
+    $path = Join-Path $launcherRoot "$launcher.exe"
+    if ($launcher -in $selectedLaunchers) {
+        Add-Result -Name "$launcher.exe" -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
+    }
+    else {
+        Add-Result -Name "$launcher.exe" -Status 'SKIP' -Details 'Non selezionato durante l installazione'
+    }
 }
 
 $profileExists = Test-Path -LiteralPath $profilePath -PathType Leaf
@@ -98,7 +151,7 @@ if ($openShiftEnabled) {
     Add-Result -Name 'Configurazione OpenShift locale' -Status $(if (Test-Path -LiteralPath $openShiftConfig -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $openShiftConfig
 }
 else {
-    Add-Result -Name 'OpenShift / Stern CLI' -Status 'SKIP' -Details 'Feature disabilitata; Stern HUD grafico resta installato'
+    Add-Result -Name 'OpenShift / Stern CLI' -Status 'SKIP' -Details 'Feature disabilitata; i launcher grafici restano indipendenti dalla CLI'
 }
 
 $results | Format-Table -AutoSize

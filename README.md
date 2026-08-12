@@ -39,7 +39,7 @@ Per verificare l'ambiente dopo l'installazione:
 
 Gli eseguibili non sono versionati nel repository: vengono compilati localmente da `install.ps1` a partire dai sorgenti presenti in `launchers/src`.
 
-A fine installazione devono esistere:
+Durante l'installazione viene chiesto quali launcher creare. Tutti e quattro sono selezionati per impostazione predefinita, ma è possibile installarne soltanto uno, due o tre. Con la selezione predefinita vengono creati:
 
 ```text
 %LOCALAPPDATA%\PowerShellCustomization\launchers\Matrix GPT.exe
@@ -48,13 +48,15 @@ A fine installazione devono esistere:
 %LOCALAPPDATA%\PowerShellCustomization\launchers\Stern HUD.exe
 ```
 
-Vengono inoltre creati quattro collegamenti nel menu Start sotto **PowerShell Customization**.
+Nel menu Start, sotto **PowerShell Customization**, viene creato un collegamento per ciascun launcher selezionato; con la selezione predefinita sono quattro.
+
+Eseguendo nuovamente `install.ps1 -Reconfigure` si può cambiare selezione. Gli EXE e i collegamenti precedentemente generati ma non più selezionati vengono rimossi.
 
 Se sul PC sono già disponibili `gcc.exe` e `windres.exe`, vengono usati. Altrimenti il build scarica una toolchain LLVM-MinGW portable nella cache locale dell'applicazione e la usa senza installarla globalmente e senza aggiungerla al PATH dell'utente.
 
 ## PNG e ICO
 
-Anche gli asset grafici sono riproducibili durante l'installazione. `assets/New-PublicAssets.ps1` genera nel profilo utente:
+I PNG e gli ICO originali sono inclusi e versionati sotto `assets/`. Durante l'installazione vengono copiati, senza rigenerarli, in:
 
 ```text
 %LOCALAPPDATA%\PowerShellCustomization\assets\icons
@@ -62,7 +64,9 @@ Anche gli asset grafici sono riproducibili durante l'installazione. `assets/New-
 %LOCALAPPDATA%\PowerShellCustomization\assets\watermarks
 ```
 
-Cyber Glass mantiene un pool di sei wallpaper e il suo launcher cambia `current.png` prima di aprire Windows Terminal, evitando quando possibile di ripetere immediatamente lo stesso sfondo.
+Cyber Glass mantiene un pool di sei wallpaper. L'installer inizializza `current.png` dal primo asset del pool e il launcher lo cambia prima di aprire Windows Terminal, evitando quando possibile di ripetere immediatamente lo stesso sfondo.
+
+Gli EXE non sono inclusi nel repository: `install.ps1` li compila localmente usando le icone versionate e salva soltanto i risultati nell'area applicativa dell'utente.
 
 ## Il tuo profile non viene sovrascritto
 
@@ -129,7 +133,7 @@ Non devono essere versionati:
 - namespace e nomi di servizi aziendali;
 - path specifici del singolo PC;
 - configurazioni locali OpenShift;
-- EXE compilati e cache della toolchain.
+- EXE compilati, output di build e cache della toolchain.
 
 I file `*.local.ps1` e `*.local.json` sono ignorati da Git.
 
