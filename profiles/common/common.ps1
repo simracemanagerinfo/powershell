@@ -1,94 +1,144 @@
-# Bootstrap di compatibilita per installazioni che puntano ancora a common.ps1.
-# Il profilo definitivo punta a bootstrap.ps1; questo file resta per una migrazione sicura.
+# Public, reusable PowerShell customizations.
+# Machine/user-specific values belong in profile.local.ps1 (ignored by Git).
 
-$runtimeRoot = $PSScriptRoot
-$bootstrapPath = Join-Path $runtimeRoot 'bootstrap.ps1'
+$WORKSPACE = if ($env:WORKSPACE_ROOT) { $env:WORKSPACE_ROOT } else { Join-Path $HOME 'workspace' }
+$customizationRuntimeRoot = $PSScriptRoot
 
-if (Test-Path -LiteralPath $bootstrapPath -PathType Leaf) {
-    . $bootstrapPath
-    return
+$AliasDescriptions = @{
+    aliases   = 'Mostra alias e funzioni personalizzate'
+    reload    = 'Sincronizza dal repository installato e ricarica il profilo PowerShell'
+    show      = 'Mostra i comandi personalizzati disponibili'
+    workspace = 'Sposta la shell nella root del workspace'
 }
 
-function global:reload {
-    [CmdletBinding()]
+function Get-CustomCommands {
+    foreach ($name in ($AliasDescriptions.Keys | Sort-Object)) {
+        $command = Get-Command $name -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($command) {
+            [pscustomobject]@{
+                Nome = $name
+                Tipo = [string]$command.CommandType
+                Comando = if ($command.CommandType -eq 'Alias') { $command.Definition } else { $command.Name }
+                Descrizione = $AliasDescriptions[$name]
+            }
+        }
+    }
+}
+
+function Show-Aliases {
+    Get-CustomCommands | Format-Table -AutoSize
+}
+
+function workspace {
+    if (-not (Test-Path -LiteralPath $WORKSPACE)) {
+        New-Item -ItemType Directory -Path $WORKSPACE -Force | Out-Null
+    }
+    Set-Location -LiteralPath $WORKSPACE
+}
+
+function Test-PowerShellCustomizationSource {
+    param([Parameter(Mandatory)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath (Join-Path $Path 'install.ps1') -PathType Leaf)) {
+        return $false
+    }
+
+    try {
+        $remote = (& git -C $Path remote get-url origin 2>$null | Select-Object -First 1)
+        if ($remote -and ([string]$remote).Trim() -match 'simracemanagerinfo/powershell(?:\.git)?$') {
+            return $true
+        }
+    }
+    catch { }
+
+    return (Split-Path -Leaf $Path) -ieq 'powershell'
+}
+
+function Resolve-PowerShellCustomizationSource {
+    $markerPath = Join-Path $customizationRuntimeRoot 'source-root.txt'
+
+    if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
+        $saved = [IO.File]::ReadAllText($markerPath).Trim()
+        if (-not [string]::IsNullOrWhiteSpace($saved) -and (Test-PowerShellCustomizationSource -Path $saved)) {
+            return $saved
+        }
+    }
+
+    $candidates = @()
+    try {
+        $gitRoot = (& git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Select-Object -First 1)
+        if ($gitRoot) { $candidates += ([string]$gitRoot).Trim() }
+    }
+    catch { }
+
+    $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
+    $candidates += @(
+        (Join-Path $documents 'powershell'),
+        (Join-Path $WORKSPACE 'powershell'),
+        (Join-Path $HOME 'powershell')
+    )
+
+    foreach ($candidate in ($candidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)) {
+        if (-not (Test-PowerShellCustomizationSource -Path $candidate)) { continue }
+
+        $resolved = [IO.Path]::GetFullPath($candidate)
+        [IO.File]::WriteAllText($markerPath, $resolved, [Text.UTF8Encoding]::new($false))
+        return $resolved
+    }
+
+    return $null
+}
+
+function reload {
     param([switch]$ProfileOnly)
 
-    $runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
-    $markerPath = Join-Path $runtimeRoot 'source-root.txt'
-
-    function Test-ReloadSource {
-        param([Parameter(Mandatory)][string]$Path)
-
-        if (-not (Test-Path -LiteralPath (Join-Path $Path 'refresh.ps1') -PathType Leaf)) {
-            return $false
-        }
-
-        try {
-            $remote = (& git -C $Path remote get-url origin 2>$null | Select-Object -First 1)
-            if ($remote -and ([string]$remote).Trim() -match 'simracemanagerinfo/powershell(?:\.git)?$') {
-                return $true
-            }
-        }
-        catch { }
-
-        return (Split-Path -Leaf $Path) -ieq 'powershell'
-    }
-
-    function Resolve-ReloadSource {
-        if (Test-Path -LiteralPath $markerPath -PathType Leaf) {
-            $saved = [IO.File]::ReadAllText($markerPath).Trim()
-            if (-not [string]::IsNullOrWhiteSpace($saved) -and (Test-ReloadSource -Path $saved)) {
-                return $saved
-            }
-        }
-
-        $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
-        $workspace = Join-Path $documents 'workspace'
-        $candidates = @()
-
-        try {
-            $gitRoot = (& git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Select-Object -First 1)
-            if ($gitRoot) { $candidates += ([string]$gitRoot).Trim() }
-        }
-        catch { }
-
-        $candidates += @(
-            (Join-Path $documents 'powershell'),
-            (Join-Path $workspace 'powershell'),
-            (Join-Path $HOME 'powershell')
-        )
-
-        foreach ($candidate in ($candidates | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)) {
-            if (-not (Test-ReloadSource -Path $candidate)) { continue }
-            return [IO.Path]::GetFullPath($candidate)
-        }
-
-        return $null
-    }
-
     if (-not $ProfileOnly) {
-        $sourceRoot = Resolve-ReloadSource
-        if (-not $sourceRoot) {
-            Write-Warning 'Clone powershell non trovato. Esegui reload una volta dalla root del repository.'
-            return
+        $sourceRoot = Resolve-PowerShellCustomizationSource
+        if ($sourceRoot) {
+            $refreshScript = Join-Path $sourceRoot 'refresh.ps1'
+            Write-Host "Sincronizzo PowerShell da: $sourceRoot" -ForegroundColor Cyan
+            try {
+                if (Test-Path -LiteralPath $refreshScript -PathType Leaf) {
+                    & $refreshScript
+                }
+                else {
+                    & (Join-Path $sourceRoot 'install.ps1') -SkipDependencies
+                }
+                if (-not $?) {
+                    Write-Warning 'La sincronizzazione ha restituito un errore; ricarico comunque il profilo corrente.'
+                }
+            }
+            catch {
+                Write-Warning "Sincronizzazione non riuscita: $($_.Exception.Message)"
+            }
         }
-
-        Write-Host "Sincronizzo PowerShell da: $sourceRoot" -ForegroundColor Cyan
-        & (Join-Path $sourceRoot 'refresh.ps1')
-        if (-not $?) {
-            Write-Warning 'La sincronizzazione ha restituito un errore.'
-            return
+        else {
+            Write-Warning 'Clone powershell non trovato. Esegui reload una volta dalla root del repository oppure usa reload -ProfileOnly.'
         }
     }
 
-    $newBootstrap = Join-Path $runtimeRoot 'bootstrap.ps1'
-    if (Test-Path -LiteralPath $newBootstrap -PathType Leaf) {
-        . $newBootstrap
-        Write-Host '[OK] PowerShellCustomization ricaricato.' -ForegroundColor Green
-        return
-    }
-
-    Write-Warning 'Bootstrap modulare non ancora disponibile. Esegui refresh.ps1 dalla root del repository.'
+    . $PROFILE
 }
 
-Write-Warning 'Runtime PowerShell precedente rilevato. Esegui reload dalla root del repository per completare la migrazione modulare.'
+Set-Alias aliases Show-Aliases
+Set-Alias show Show-Aliases
+
+# Command plugin autoconsistenti: ogni *.ps1 può definire funzioni/alias e
+# registrare le proprie descrizioni in $AliasDescriptions.
+$commandsRoot = Join-Path $customizationRuntimeRoot 'commands'
+if (Test-Path -LiteralPath $commandsRoot -PathType Container) {
+    foreach ($commandFile in Get-ChildItem -LiteralPath $commandsRoot -File -Filter '*.ps1' | Sort-Object Name) {
+        try {
+            . $commandFile.FullName
+        }
+        catch {
+            Write-Warning "Command plugin non caricato: $($commandFile.Name) - $($_.Exception.Message)"
+        }
+    }
+}
+
+# Optional local extensions. This file must never be committed.
+$localProfile = Join-Path $PSScriptRoot 'profile.local.ps1'
+if (Test-Path -LiteralPath $localProfile -PathType Leaf) {
+    . $localProfile
+}
