@@ -34,6 +34,30 @@ if (Copy-TextFileIfChanged -Source (Join-Path $sourceRoot 'profiles\common\commo
     $changed += 'common.ps1'
 }
 
+# Command plugin: la directory runtime viene mantenuta allineata al clone.
+# Basta aggiungere/rimuovere un *.ps1 in commands/ e lanciare reload.
+$commandsSource = Join-Path $sourceRoot 'commands'
+$commandsTarget = Join-Path $runtimeRoot 'commands'
+New-Item -ItemType Directory -Path $commandsTarget -Force | Out-Null
+
+$sourceCommandNames = @()
+if (Test-Path -LiteralPath $commandsSource -PathType Container) {
+    foreach ($file in Get-ChildItem -LiteralPath $commandsSource -File -Filter '*.ps1') {
+        $sourceCommandNames += $file.Name
+        $destination = Join-Path $commandsTarget $file.Name
+        if (Copy-TextFileIfChanged -Source $file.FullName -Destination $destination) {
+            $changed += "commands/$($file.Name)"
+        }
+    }
+}
+
+foreach ($runtimeCommand in Get-ChildItem -LiteralPath $commandsTarget -File -Filter '*.ps1' -ErrorAction SilentlyContinue) {
+    if ($runtimeCommand.Name -notin $sourceCommandNames) {
+        Remove-Item -LiteralPath $runtimeCommand.FullName -Force
+        $changed += "commands/$($runtimeCommand.Name) (rimosso)"
+    }
+}
+
 # OpenShift/Stern resta opzionale anche durante il refresh.
 $openShiftEnabled = $false
 $optionsPath = Join-Path $runtimeRoot 'install-options.json'
@@ -61,8 +85,8 @@ elseif (Test-Path -LiteralPath $openShiftTarget -PathType Leaf) {
     $changed += 'openshift-stern.ps1 (rimosso)'
 }
 
-# Supporta eventuali script versionati aggiunti in futuro senza richiedere una
-# nuova logica di copia nel comando reload.
+# Supporta eventuali script/config di supporto aggiunti in futuro senza richiedere
+# modifiche al core. I command possono richiamarli dal runtime scripts/.
 $scriptsSource = Join-Path $sourceRoot 'scripts'
 if (Test-Path -LiteralPath $scriptsSource -PathType Container) {
     foreach ($file in Get-ChildItem -LiteralPath $scriptsSource -File) {
