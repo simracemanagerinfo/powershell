@@ -85,15 +85,26 @@ elseif (Test-Path -LiteralPath $openShiftTarget -PathType Leaf) {
     $changed += 'openshift-stern.ps1 (rimosso)'
 }
 
-# Supporta eventuali script/config di supporto aggiunti in futuro senza richiedere
-# modifiche al core. I command possono richiamarli dal runtime scripts/.
+# Script e configurazioni di supporto vengono sincronizzati come i command.
 $scriptsSource = Join-Path $sourceRoot 'scripts'
+$scriptsTarget = Join-Path $runtimeRoot 'scripts'
+New-Item -ItemType Directory -Path $scriptsTarget -Force | Out-Null
+
+$sourceScriptNames = @()
 if (Test-Path -LiteralPath $scriptsSource -PathType Container) {
     foreach ($file in Get-ChildItem -LiteralPath $scriptsSource -File) {
-        $destination = Join-Path (Join-Path $runtimeRoot 'scripts') $file.Name
+        $sourceScriptNames += $file.Name
+        $destination = Join-Path $scriptsTarget $file.Name
         if (Copy-TextFileIfChanged -Source $file.FullName -Destination $destination) {
             $changed += "scripts/$($file.Name)"
         }
+    }
+}
+
+foreach ($runtimeScript in Get-ChildItem -LiteralPath $scriptsTarget -File -ErrorAction SilentlyContinue) {
+    if ($runtimeScript.Name -notin $sourceScriptNames) {
+        Remove-Item -LiteralPath $runtimeScript.FullName -Force
+        $changed += "scripts/$($runtimeScript.Name) (rimosso)"
     }
 }
 
