@@ -114,16 +114,26 @@ if (Test-Path -LiteralPath $optionsPath -PathType Leaf) {
     }
 }
 
+$featuresTarget = Join-Path $runtimeRoot 'features'
+New-Item -ItemType Directory -Path $featuresTarget -Force | Out-Null
 $openShiftSource = Join-Path $sourceRoot 'profiles\features\openshift-stern.ps1'
-$openShiftTarget = Join-Path $runtimeRoot 'openshift-stern.ps1'
+$openShiftTarget = Join-Path $featuresTarget 'openshift-stern.ps1'
 if ($openShiftEnabled) {
     if (Copy-TextFileIfChanged -Source $openShiftSource -Destination $openShiftTarget) {
-        $changed += 'openshift-stern.ps1'
+        $changed += 'features/openshift-stern.ps1'
     }
 }
 elseif (Test-Path -LiteralPath $openShiftTarget -PathType Leaf) {
     Remove-Item -LiteralPath $openShiftTarget -Force
-    $changed += 'openshift-stern.ps1 (rimosso)'
+    $changed += 'features/openshift-stern.ps1 (rimosso)'
+}
+
+# Rimuove la vecchia copia root: i profili legacy la cercano ancora, ma così
+# OpenShift viene caricato una sola volta, esclusivamente dal modulo.
+$legacyOpenShiftTarget = Join-Path $runtimeRoot 'openshift-stern.ps1'
+if (Test-Path -LiteralPath $legacyOpenShiftTarget -PathType Leaf) {
+    Remove-Item -LiteralPath $legacyOpenShiftTarget -Force
+    $changed += 'openshift-stern.ps1 legacy (rimosso)'
 }
 
 if ($changed.Count -eq 0) {
