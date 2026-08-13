@@ -93,7 +93,7 @@ int WINAPI wWinMain(
     startupInfo.cb = sizeof(startupInfo);
 
     if (!CreateProcessW(
-            wtPath,
+            NULL,
             commandLine,
             NULL,
             NULL,
