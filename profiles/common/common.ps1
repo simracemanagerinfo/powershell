@@ -95,10 +95,15 @@ function reload {
     if (-not $ProfileOnly) {
         $sourceRoot = Resolve-PowerShellCustomizationSource
         if ($sourceRoot) {
-            $installer = Join-Path $sourceRoot 'install.ps1'
+            $refreshScript = Join-Path $sourceRoot 'refresh.ps1'
             Write-Host "Sincronizzo PowerShell da: $sourceRoot" -ForegroundColor Cyan
             try {
-                & $installer -SkipDependencies
+                if (Test-Path -LiteralPath $refreshScript -PathType Leaf) {
+                    & $refreshScript
+                }
+                else {
+                    & (Join-Path $sourceRoot 'install.ps1') -SkipDependencies
+                }
                 if (-not $?) {
                     Write-Warning 'La sincronizzazione ha restituito un errore; ricarico comunque il profilo corrente.'
                 }
