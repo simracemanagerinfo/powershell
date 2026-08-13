@@ -123,6 +123,20 @@ function reload {
 Set-Alias aliases Show-Aliases
 Set-Alias show Show-Aliases
 
+# Command plugin autoconsistenti: ogni *.ps1 può definire funzioni/alias e
+# registrare le proprie descrizioni in $AliasDescriptions.
+$commandsRoot = Join-Path $customizationRuntimeRoot 'commands'
+if (Test-Path -LiteralPath $commandsRoot -PathType Container) {
+    foreach ($commandFile in Get-ChildItem -LiteralPath $commandsRoot -File -Filter '*.ps1' | Sort-Object Name) {
+        try {
+            . $commandFile.FullName
+        }
+        catch {
+            Write-Warning "Command plugin non caricato: $($commandFile.Name) - $($_.Exception.Message)"
+        }
+    }
+}
+
 # Optional local extensions. This file must never be committed.
 $localProfile = Join-Path $PSScriptRoot 'profile.local.ps1'
 if (Test-Path -LiteralPath $localProfile -PathType Leaf) {
