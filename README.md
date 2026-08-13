@@ -35,6 +35,38 @@ Per verificare l'ambiente dopo l'installazione:
 .\doctor.ps1
 ```
 
+## `reload`: sincronizza le modifiche senza reinstallare tutto
+
+Dopo l'installazione il comando:
+
+```powershell
+reload
+```
+
+non si limita a rieseguire `$PROFILE`.
+
+Prima individua il clone locale di questo repository, esegue `refresh.ps1` e sincronizza nel runtime i file PowerShell versionati che possono essere cambiati durante lo sviluppo, quindi ricarica il profilo corrente.
+
+Questo permette, per esempio, di modificare o aggiungere una funzione nel repository e renderla disponibile nella shell corrente con un solo comando, senza rilanciare l'installer completo e senza ricompilare i launcher.
+
+La prima volta `reload` cerca il repository corrente e alcune directory standard. Quando lo trova salva il percorso soltanto nel runtime locale:
+
+```text
+%LOCALAPPDATA%\PowerShellCustomization\source-root.txt
+```
+
+Da quel momento può sincronizzare il clone anche se `reload` viene eseguito da un'altra directory.
+
+Se il repository è stato clonato in un path non standard, eseguire `reload` una volta dalla root del clone per registrarlo.
+
+Per avere il vecchio comportamento e ricaricare soltanto `$PROFILE` senza sincronizzare nulla:
+
+```powershell
+reload -ProfileOnly
+```
+
+> Dopo l'aggiornamento da una versione precedente che non contiene ancora questa funzionalità, eseguire una volta `git pull` e `.\install.ps1`. Da quel momento i successivi aggiornamenti dei file runtime possono essere applicati con `reload`.
+
 ## I quattro EXE
 
 Gli eseguibili non sono versionati nel repository: vengono compilati localmente da `install.ps1` a partire dai sorgenti presenti in `launchers/src`.
