@@ -53,8 +53,8 @@ if (Test-Path -LiteralPath $commandsRoot -PathType Container) {
     }
 }
 
-# Feature OpenShift/Stern opzionale e generica.
-$openShiftFeature = Join-Path $customizationRuntimeRoot 'openshift-stern.ps1'
+# Feature OpenShift/Stern opzionale e generica, caricata soltanto dal modulo.
+$openShiftFeature = Join-Path $customizationRuntimeRoot 'features\openshift-stern.ps1'
 if (Test-Path -LiteralPath $openShiftFeature -PathType Leaf) {
     . $openShiftFeature
 }
