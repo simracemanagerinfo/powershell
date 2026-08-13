@@ -6,6 +6,22 @@ $ErrorActionPreference = 'Stop'
 $runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
 $sourceRoot = $PSScriptRoot
 
+function Write-TextIfChanged {
+    param(
+        [Parameter(Mandatory)][string]$Content,
+        [Parameter(Mandatory)][string]$Destination
+    )
+
+    if ((Test-Path -LiteralPath $Destination -PathType Leaf) -and
+        [IO.File]::ReadAllText($Destination) -ceq $Content) {
+        return $false
+    }
+
+    New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
+    [IO.File]::WriteAllText($Destination, $Content, [Text.UTF8Encoding]::new($false))
+    return $true
+}
+
 function Copy-TextFileIfChanged {
     param(
         [Parameter(Mandatory)][string]$Source,
@@ -16,30 +32,37 @@ function Copy-TextFileIfChanged {
         return $false
     }
 
-    $content = [IO.File]::ReadAllText($Source)
-    if ((Test-Path -LiteralPath $Destination -PathType Leaf) -and
-        [IO.File]::ReadAllText($Destination) -ceq $content) {
-        return $false
-    }
-
-    New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
-    [IO.File]::WriteAllText($Destination, $content, [Text.UTF8Encoding]::new($false))
-    return $true
+    return Write-TextIfChanged -Content ([IO.File]::ReadAllText($Source)) -Destination $Destination
 }
 
 New-Item -ItemType Directory -Path $runtimeRoot -Force | Out-Null
 $changed = @()
 
-if (Copy-TextFileIfChanged -Source (Join-Path $sourceRoot 'profiles\common\common.ps1') -Destination (Join-Path $runtimeRoot 'common.ps1')) {
-    $changed += 'common.ps1'
+foreach ($fileName in @('common.ps1', 'bootstrap.ps1')) {
+    $source = Join-Path $sourceRoot "profiles\common\$fileName"
+    $destination = Join-Path $runtimeRoot $fileName
+    if (Copy-TextFileIfChanged -Source $source -Destination $destination) {
+        $changed += $fileName
+    }
 }
 
-# Command plugin: la directory runtime viene mantenuta allineata al clone.
-# Basta aggiungere/rimuovere un *.ps1 in commands/ e lanciare reload.
+$runtimeSource = Join-Path $sourceRoot 'profiles\common\runtime.ps1'
+$moduleTarget = Join-Path $runtimeRoot 'PowerShellCustomization.psm1'
+$moduleContent = [IO.File]::ReadAllText($runtimeSource).TrimEnd("`r", "`n") +
+    "`r`n`r`nExport-ModuleMember -Function * -Alias *`r`n"
+if (Write-TextIfChanged -Content $moduleContent -Destination $moduleTarget) {
+    $changed += 'PowerShellCustomization.psm1'
+}
+
+$sourceMarker = Join-Path $runtimeRoot 'source-root.txt'
+$resolvedSource = [IO.Path]::GetFullPath($sourceRoot)
+if (Write-TextIfChanged -Content $resolvedSource -Destination $sourceMarker) {
+    $changed += 'source-root.txt'
+}
+
 $commandsSource = Join-Path $sourceRoot 'commands'
 $commandsTarget = Join-Path $runtimeRoot 'commands'
 New-Item -ItemType Directory -Path $commandsTarget -Force | Out-Null
-
 $sourceCommandNames = @()
 if (Test-Path -LiteralPath $commandsSource -PathType Container) {
     foreach ($file in Get-ChildItem -LiteralPath $commandsSource -File -Filter '*.ps1') {
@@ -50,7 +73,6 @@ if (Test-Path -LiteralPath $commandsSource -PathType Container) {
         }
     }
 }
-
 foreach ($runtimeCommand in Get-ChildItem -LiteralPath $commandsTarget -File -Filter '*.ps1' -ErrorAction SilentlyContinue) {
     if ($runtimeCommand.Name -notin $sourceCommandNames) {
         Remove-Item -LiteralPath $runtimeCommand.FullName -Force
@@ -58,7 +80,26 @@ foreach ($runtimeCommand in Get-ChildItem -LiteralPath $commandsTarget -File -Fi
     }
 }
 
-# OpenShift/Stern resta opzionale anche durante il refresh.
+$scriptsSource = Join-Path $sourceRoot 'scripts'
+$scriptsTarget = Join-Path $runtimeRoot 'scripts'
+New-Item -ItemType Directory -Path $scriptsTarget -Force | Out-Null
+$sourceScriptNames = @()
+if (Test-Path -LiteralPath $scriptsSource -PathType Container) {
+    foreach ($file in Get-ChildItem -LiteralPath $scriptsSource -File) {
+        $sourceScriptNames += $file.Name
+        $destination = Join-Path $scriptsTarget $file.Name
+        if (Copy-TextFileIfChanged -Source $file.FullName -Destination $destination) {
+            $changed += "scripts/$($file.Name)"
+        }
+    }
+}
+foreach ($runtimeScript in Get-ChildItem -LiteralPath $scriptsTarget -File -ErrorAction SilentlyContinue) {
+    if ($runtimeScript.Name -notin $sourceScriptNames) {
+        Remove-Item -LiteralPath $runtimeScript.FullName -Force
+        $changed += "scripts/$($runtimeScript.Name) (rimosso)"
+    }
+}
+
 $openShiftEnabled = $false
 $optionsPath = Join-Path $runtimeRoot 'install-options.json'
 if (Test-Path -LiteralPath $optionsPath -PathType Leaf) {
@@ -83,29 +124,6 @@ if ($openShiftEnabled) {
 elseif (Test-Path -LiteralPath $openShiftTarget -PathType Leaf) {
     Remove-Item -LiteralPath $openShiftTarget -Force
     $changed += 'openshift-stern.ps1 (rimosso)'
-}
-
-# Script e configurazioni di supporto vengono sincronizzati come i command.
-$scriptsSource = Join-Path $sourceRoot 'scripts'
-$scriptsTarget = Join-Path $runtimeRoot 'scripts'
-New-Item -ItemType Directory -Path $scriptsTarget -Force | Out-Null
-
-$sourceScriptNames = @()
-if (Test-Path -LiteralPath $scriptsSource -PathType Container) {
-    foreach ($file in Get-ChildItem -LiteralPath $scriptsSource -File) {
-        $sourceScriptNames += $file.Name
-        $destination = Join-Path $scriptsTarget $file.Name
-        if (Copy-TextFileIfChanged -Source $file.FullName -Destination $destination) {
-            $changed += "scripts/$($file.Name)"
-        }
-    }
-}
-
-foreach ($runtimeScript in Get-ChildItem -LiteralPath $scriptsTarget -File -ErrorAction SilentlyContinue) {
-    if ($runtimeScript.Name -notin $sourceScriptNames) {
-        Remove-Item -LiteralPath $runtimeScript.FullName -Force
-        $changed += "scripts/$($runtimeScript.Name) (rimosso)"
-    }
 }
 
 if ($changed.Count -eq 0) {
