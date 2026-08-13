@@ -67,6 +67,66 @@ reload -ProfileOnly
 
 > Dopo l'aggiornamento da una versione precedente che non contiene ancora questa funzionalità, eseguire una volta `git pull` e `.\install.ps1`. Da quel momento i successivi aggiornamenti dei file runtime possono essere applicati con `reload`.
 
+## Command plugin: copia, reload, enjoy
+
+La directory:
+
+```text
+commands\
+```
+
+è riservata ai command PowerShell autoconsistenti.
+
+Ogni file `commands\*.ps1` viene sincronizzato nel runtime da `reload` e poi caricato automaticamente dal profilo. Un command può quindi definire da solo:
+
+- funzioni;
+- alias;
+- descrizioni per `show` / `aliases` tramite `$AliasDescriptions`.
+
+Per aggiungere un command non è necessario modificare `common.ps1`.
+
+Esempio:
+
+```powershell
+$AliasDescriptions['ciao'] = 'Esempio di command autoconsistente'
+
+function ciao {
+    param([string]$Nome = 'mondo')
+    Write-Host "Ciao $Nome"
+}
+```
+
+Salvare il file come:
+
+```text
+commands\ciao.ps1
+```
+
+e poi eseguire:
+
+```powershell
+reload
+ciao Diego
+```
+
+Se il command richiede file di supporto, questi possono essere messi in `scripts/`, ad esempio:
+
+```text
+commands\mio-comando.ps1
+scripts\mio-helper.ps1
+scripts\mio-config.json
+```
+
+Dopo aver copiato i file nei rispettivi path basta ancora una volta:
+
+```powershell
+reload
+```
+
+Rimuovendo un `.ps1` da `commands/` e rilanciando `reload`, viene rimossa anche la relativa copia runtime.
+
+Il contratto completo e un template sono documentati in `commands/README.md`.
+
 ## I quattro EXE
 
 Gli eseguibili non sono versionati nel repository: vengono compilati localmente da `install.ps1` a partire dai sorgenti presenti in `launchers/src`.
