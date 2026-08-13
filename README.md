@@ -19,13 +19,16 @@ Core grafico:
 
 Non installa JDK, Maven, NVM, CMake, BusyBox o altre toolchain da sviluppatore non necessarie al terminale.
 
-## Installazione
+## Installazione consigliata
 
 ```powershell
 git clone https://github.com/simracemanagerinfo/powershell.git
 cd powershell
-.\install.ps1
+.\setup.ps1
 ```
+
+`setup.ps1` esegue l'installer e subito dopo prepara il runtime modulare usato da `reload`.
+Al termine apri una nuova tab PowerShell.
 
 L'installer preferisce sempre operazioni **CurrentUser / user-level**. Se una dipendenza manca, chiede prima se tentare l'installazione per il solo utente corrente. Se questa fallisce, non tenta automaticamente un'installazione elevata.
 
@@ -35,37 +38,65 @@ Per verificare l'ambiente dopo l'installazione:
 .\doctor.ps1
 ```
 
-## `reload`: sincronizza le modifiche senza reinstallare tutto
+## `reload`: sincronizza e ricarica il modulo nella stessa sessione
 
-Dopo l'installazione il comando:
+Dopo il setup il comando:
 
 ```powershell
 reload
 ```
 
-non si limita a rieseguire `$PROFILE`.
+non riesegue più `$PROFILE`.
 
-Prima individua il clone locale di questo repository, esegue `refresh.ps1` e sincronizza nel runtime i file PowerShell versionati che possono essere cambiati durante lo sviluppo, quindi ricarica il profilo corrente.
+`reload`:
 
-Questo permette, per esempio, di modificare o aggiungere una funzione nel repository e renderla disponibile nella shell corrente con un solo comando, senza rilanciare l'installer completo e senza ricompilare i launcher.
+1. individua il clone locale del repository;
+2. esegue `refresh.ps1`;
+3. sincronizza `commands/`, `scripts/` e le feature opzionali nel runtime;
+4. rigenera `PowerShellCustomization.psm1`;
+5. reimporta il modulo con `Import-Module -Force -Global` nella sessione corrente.
 
-La prima volta `reload` cerca il repository corrente e alcune directory standard. Quando lo trova salva il percorso soltanto nel runtime locale:
+Questo evita i problemi di scope causati dal vecchio `. $PROFILE` eseguito dentro la funzione `reload` e permette di applicare davvero aggiunte, modifiche e rimozioni dei command senza aprire una nuova tab.
+
+Il percorso del clone viene salvato soltanto nel runtime locale:
 
 ```text
 %LOCALAPPDATA%\PowerShellCustomization\source-root.txt
 ```
 
-Da quel momento può sincronizzare il clone anche se `reload` viene eseguito da un'altra directory.
+Da quel momento `reload` funziona anche se viene eseguito da un'altra directory.
 
-Se il repository è stato clonato in un path non standard, eseguire `reload` una volta dalla root del clone per registrarlo.
+Per sincronizzare modifiche arrivate da Git:
 
-Per avere il vecchio comportamento e ricaricare soltanto `$PROFILE` senza sincronizzare nulla:
+```powershell
+git pull
+reload
+```
+
+Per modifiche locali ai command o agli script basta:
+
+```powershell
+reload
+```
+
+Per ricaricare soltanto il modulo senza sincronizzare il repository:
 
 ```powershell
 reload -ProfileOnly
 ```
 
-> Dopo l'aggiornamento da una versione precedente che non contiene ancora questa funzionalità, eseguire una volta `git pull` e `.\install.ps1`. Da quel momento i successivi aggiornamenti dei file runtime possono essere applicati con `reload`.
+### Aggiornamento da una vecchia installazione
+
+Se `reload` era già disponibile nella vecchia versione:
+
+```powershell
+git pull
+reload
+```
+
+Il primo `reload` copia automaticamente bootstrap e modulo nel runtime; i successivi usano direttamente il nuovo meccanismo modulare.
+
+Su una nuova installazione usa invece `setup.ps1`, così il bootstrap è pronto fin dall'inizio.
 
 ## Command plugin: copia, reload, enjoy
 
@@ -77,7 +108,7 @@ commands\
 
 è riservata ai command PowerShell autoconsistenti.
 
-Ogni file `commands\*.ps1` viene sincronizzato nel runtime da `reload` e poi caricato automaticamente dal profilo. Un command può quindi definire da solo:
+Ogni file `commands\*.ps1` viene sincronizzato nel runtime da `reload` e caricato automaticamente dal modulo. Un command può quindi definire da solo:
 
 - funzioni;
 - alias;
@@ -123,7 +154,7 @@ Dopo aver copiato i file nei rispettivi path basta ancora una volta:
 reload
 ```
 
-Rimuovendo un `.ps1` da `commands/` e rilanciando `reload`, viene rimossa anche la relativa copia runtime.
+Rimuovendo un `.ps1` da `commands/` e rilanciando `reload`, viene rimossa anche la relativa copia runtime e il modulo viene reimportato senza quel command.
 
 Il contratto completo e un template sono documentati in `commands/README.md`.
 
@@ -142,7 +173,13 @@ Durante l'installazione viene chiesto quali launcher creare. Tutti e quattro son
 
 Nel menu Start, sotto **PowerShell Customization**, viene creato un collegamento per ciascun launcher selezionato; con la selezione predefinita sono quattro.
 
-Eseguendo nuovamente `install.ps1 -Reconfigure` si può cambiare selezione. Gli EXE e i collegamenti precedentemente generati ma non più selezionati vengono rimossi.
+Per cambiare selezione:
+
+```powershell
+.\setup.ps1 -Reconfigure
+```
+
+Gli EXE e i collegamenti precedentemente generati ma non più selezionati vengono rimossi.
 
 Se sul PC sono già disponibili `gcc.exe` e `windres.exe`, vengono usati. Altrimenti il build scarica una toolchain LLVM-MinGW portable nella cache locale dell'applicazione e la usa senza installarla globalmente e senza aggiungerla al PATH dell'utente.
 
@@ -176,7 +213,7 @@ L'installer:
 # <<< powershell-customization managed <<<
 ```
 
-Il resto del profile non viene modificato.
+Il resto del profile non viene modificato. Il runtime modulare è caricato dal bootstrap sotto `%LOCALAPPDATA%\PowerShellCustomization`.
 
 ## Windows Terminal
 
@@ -214,7 +251,7 @@ Endpoint, namespace e nomi di servizi reali **non appartengono al repository pub
 Per cambiare scelta successivamente:
 
 ```powershell
-.\install.ps1 -Reconfigure
+.\setup.ps1 -Reconfigure
 ```
 
 ## Dati esclusi dal repository pubblico
