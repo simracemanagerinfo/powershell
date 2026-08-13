@@ -34,16 +34,31 @@ if (Copy-TextFileIfChanged -Source (Join-Path $sourceRoot 'profiles\common\commo
     $changed += 'common.ps1'
 }
 
-# Mantiene aggiornate le feature versionate. Il blocco gestito nel profile decide
-# quali file vengono realmente caricati in base alle opzioni dell'installazione.
-$featuresSource = Join-Path $sourceRoot 'profiles\features'
-if (Test-Path -LiteralPath $featuresSource -PathType Container) {
-    foreach ($file in Get-ChildItem -LiteralPath $featuresSource -File -Filter '*.ps1') {
-        $destination = Join-Path $runtimeRoot $file.Name
-        if (Copy-TextFileIfChanged -Source $file.FullName -Destination $destination) {
-            $changed += $file.Name
+# OpenShift/Stern resta opzionale anche durante il refresh.
+$openShiftEnabled = $false
+$optionsPath = Join-Path $runtimeRoot 'install-options.json'
+if (Test-Path -LiteralPath $optionsPath -PathType Leaf) {
+    try {
+        $options = [IO.File]::ReadAllText($optionsPath) | ConvertFrom-Json
+        if ($options.PSObject.Properties['OpenShiftStern']) {
+            $openShiftEnabled = [bool]$options.OpenShiftStern
         }
     }
+    catch {
+        Write-Warning "Impossibile leggere le opzioni installate: $($_.Exception.Message)"
+    }
+}
+
+$openShiftSource = Join-Path $sourceRoot 'profiles\features\openshift-stern.ps1'
+$openShiftTarget = Join-Path $runtimeRoot 'openshift-stern.ps1'
+if ($openShiftEnabled) {
+    if (Copy-TextFileIfChanged -Source $openShiftSource -Destination $openShiftTarget) {
+        $changed += 'openshift-stern.ps1'
+    }
+}
+elseif (Test-Path -LiteralPath $openShiftTarget -PathType Leaf) {
+    Remove-Item -LiteralPath $openShiftTarget -Force
+    $changed += 'openshift-stern.ps1 (rimosso)'
 }
 
 # Supporta eventuali script versionati aggiunti in futuro senza richiedere una
