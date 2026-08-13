@@ -108,7 +108,7 @@ foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hls
 foreach ($asset in @(
     'icons\matrix_gpt.ico',
     'icons\matrix_gpt_clear.ico',
-    'icons\svi_gpt_original.ico',
+    'icons\svi_gpt.ico',
     'icons\stern_logs.ico',
     'watermarks\svi_gpt.png',
     'watermarks\stern_logs.png',

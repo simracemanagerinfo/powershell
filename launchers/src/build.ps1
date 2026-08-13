@@ -106,7 +106,7 @@ function New-ResourceScript {
 $launcherDefinitions = @(
     @{ Name = 'Matrix GPT'; Source = 'Matrix GPT.c'; Icon = 'matrix_gpt.ico' },
     @{ Name = 'Cyber Glass'; Source = 'Cyber Glass.c'; Icon = 'matrix_gpt_clear.ico' },
-    @{ Name = 'Neon Dev'; Source = 'Neon Dev.c'; Icon = 'svi_gpt_original.ico' },
+    @{ Name = 'Neon Dev'; Source = 'Neon Dev.c'; Icon = 'svi_gpt.ico' },
     @{ Name = 'Stern HUD'; Source = 'Stern HUD.c'; Icon = 'stern_logs.ico' }
 )
 

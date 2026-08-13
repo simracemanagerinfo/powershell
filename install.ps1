@@ -448,7 +448,7 @@ function Install-Graphics {
         'backgrounds\pool\06_simrace_night_race.png',
         'icons\matrix_gpt.ico',
         'icons\matrix_gpt_clear.ico',
-        'icons\svi_gpt_original.ico',
+        'icons\svi_gpt.ico',
         'icons\stern_logs.ico',
         'watermarks\svi_gpt.png',
         'watermarks\stern_logs.png'

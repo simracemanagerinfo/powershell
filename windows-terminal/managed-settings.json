@@ -7,7 +7,10 @@
       "startingDirectory": "%USERPROFILE%",
       "colorScheme": "matrix_neon_gpt",
       "icon": "{{ASSET_ROOT}}\\icons\\matrix_gpt.ico",
-      "font": { "face": "MesloLGM Nerd Font", "size": 9 },
+      "font": {
+        "face": "MesloLGM Nerd Font",
+        "size": 9
+      },
       "cursorShape": "vintage",
       "experimental.pixelShaderPath": "{{RUNTIME_ROOT}}\\shaders\\matrix_rain.hlsl",
       "opacity": 94,
@@ -26,7 +29,10 @@
       "backgroundImageAlignment": "center",
       "backgroundImageOpacity": 0.22,
       "backgroundImageStretchMode": "uniformToFill",
-      "font": { "face": "MesloLGM Nerd Font", "size": 9 },
+      "font": {
+        "face": "MesloLGM Nerd Font",
+        "size": 9
+      },
       "cursorShape": "bar",
       "experimental.pixelShaderPath": "{{RUNTIME_ROOT}}\\shaders\\cyber_glass_hud.hlsl",
       "opacity": 82,
@@ -40,12 +46,15 @@
       "commandline": "pwsh.exe -NoLogo -NoExit -NoProfile -File \"{{RUNTIME_ROOT}}\\Start-CyberProfile.ps1\" -Theme neon_dev_gpt",
       "startingDirectory": "%USERPROFILE%",
       "colorScheme": "neon_dev_gpt",
-      "icon": "{{ASSET_ROOT}}\\icons\\svi_gpt_original.ico",
+      "icon": "{{ASSET_ROOT}}\\icons\\svi_gpt.ico",
       "backgroundImage": "{{ASSET_ROOT}}\\watermarks\\svi_gpt.png",
       "backgroundImageAlignment": "bottomRight",
       "backgroundImageOpacity": 0.12,
       "backgroundImageStretchMode": "none",
-      "font": { "face": "MesloLGM Nerd Font", "size": 9 },
+      "font": {
+        "face": "MesloLGM Nerd Font",
+        "size": 9
+      },
       "cursorShape": "bar",
       "experimental.pixelShaderPath": "{{RUNTIME_ROOT}}\\shaders\\neon_glow.hlsl",
       "opacity": 97,
@@ -64,7 +73,10 @@
       "backgroundImageAlignment": "bottomRight",
       "backgroundImageOpacity": 0.08,
       "backgroundImageStretchMode": "none",
-      "font": { "face": "MesloLGM Nerd Font", "size": 9 },
+      "font": {
+        "face": "MesloLGM Nerd Font",
+        "size": 9
+      },
       "cursorShape": "filledBox",
       "opacity": 94,
       "padding": "10, 8, 10, 8",
