@@ -100,7 +100,7 @@ function Get-PowerShell7Path {
 
 function Ensure-SupportedWindows {
     if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-        throw 'Questo installer è supportato solo su Windows.'
+        throw "Questo installer e' supportato solo su Windows."
     }
 
     $versionKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
@@ -119,7 +119,7 @@ function Get-WinGetPath {
     Ensure-WindowsAppsPath
     $winget = Resolve-BootstrapCommand -Name 'winget.exe'
     if (-not $winget) {
-        throw 'WinGet non è disponibile. Installa o aggiorna Microsoft App Installer, quindi rilancia install.ps1.'
+        throw "WinGet non e' disponibile. Installa o aggiorna Microsoft App Installer, quindi rilancia install.ps1."
     }
     return $winget
 }
@@ -127,7 +127,7 @@ function Get-WinGetPath {
 function Install-PowerShell7Bootstrap {
     param([Parameter(Mandatory)][string]$WingetPath)
 
-    Write-Host '[BOOTSTRAP] PowerShell 7 non trovato. Lo installo per l’utente corrente...' -ForegroundColor Cyan
+    Write-Host "[BOOTSTRAP] PowerShell 7 non trovato. Lo installo per l'utente corrente..." -ForegroundColor Cyan
     & $WingetPath install --id Microsoft.PowerShell --exact --source winget --scope user --accept-package-agreements --accept-source-agreements --silent
     if ($LASTEXITCODE -ne 0) {
         throw "Installazione di PowerShell 7 fallita. WinGet exit code: $LASTEXITCODE"
@@ -140,7 +140,29 @@ function Install-PowerShell7Bootstrap {
         Start-Sleep -Seconds 1
     }
 
-    throw 'PowerShell 7 risulta installato, ma pwsh.exe non è disponibile nel PATH o negli App Execution Alias.'
+    throw "PowerShell 7 risulta installato, ma pwsh.exe non e' disponibile nel PATH o negli App Execution Alias."
+}
+
+function Ensure-WindowsTerminalBootstrap {
+    param([Parameter(Mandatory)][string]$WingetPath)
+
+    $wt = Resolve-BootstrapCommand -Name 'wt.exe'
+    if ($wt) { return $wt }
+
+    Write-Host '[BOOTSTRAP] Windows Terminal non trovato. Lo installo...' -ForegroundColor Cyan
+    & $WingetPath install --id Microsoft.WindowsTerminal --exact --source winget --accept-package-agreements --accept-source-agreements --silent
+    if ($LASTEXITCODE -ne 0) {
+        throw "Installazione di Windows Terminal fallita. WinGet exit code: $LASTEXITCODE"
+    }
+
+    for ($attempt = 0; $attempt -lt 15; $attempt++) {
+        Ensure-WindowsAppsPath
+        $wt = Resolve-BootstrapCommand -Name 'wt.exe'
+        if ($wt) { return $wt }
+        Start-Sleep -Seconds 1
+    }
+
+    throw "Windows Terminal risulta installato, ma wt.exe non e' disponibile nel PATH o negli App Execution Alias."
 }
 
 function Invoke-InstallerWithPowerShell7 {
@@ -164,10 +186,10 @@ $bound = Import-Clixml -LiteralPath $ArgumentsFile
         $forwardParameters | Export-Clixml -LiteralPath $argumentsFile
         [IO.File]::WriteAllText($relayFile, $relay, [Text.UTF8Encoding]::new($false))
 
-        Write-Host '[BOOTSTRAP] Continuo automaticamente l’installazione con PowerShell 7...' -ForegroundColor Cyan
+        Write-Host "[BOOTSTRAP] Continuo automaticamente l'installazione con PowerShell 7..." -ForegroundColor Cyan
         & $PwshPath -NoLogo -NoProfile -ExecutionPolicy Bypass -File $relayFile -InstallerPath $scriptPath -ArgumentsFile $argumentsFile
         if ($LASTEXITCODE -ne 0) {
-            throw "L'installazione eseguita con PowerShell 7 è terminata con exit code $LASTEXITCODE."
+            throw "L'installazione eseguita con PowerShell 7 e' terminata con exit code $LASTEXITCODE."
         }
     }
     finally {
@@ -199,7 +221,7 @@ if ($PSVersionTable.PSEdition -ne 'Core' -or $PSVersionTable.PSVersion.Major -lt
     $pwsh = Get-PowerShell7Path
     if (-not $pwsh) {
         if ($SkipDependencies) {
-            throw 'PowerShell 7 non è installato e -SkipDependencies impedisce il bootstrap automatico.'
+            throw "PowerShell 7 non e' installato e -SkipDependencies impedisce il bootstrap automatico."
         }
         $winget = Get-WinGetPath
         $pwsh = Install-PowerShell7Bootstrap -WingetPath $winget
@@ -214,7 +236,8 @@ if (-not (Test-Path -LiteralPath $corePath -PathType Leaf)) {
 }
 
 if (-not $SkipDependencies) {
-    Get-WinGetPath | Out-Null
+    $winget = Get-WinGetPath
+    Ensure-WindowsTerminalBootstrap -WingetPath $winget | Out-Null
 }
 
 & $corePath @forwardParameters
