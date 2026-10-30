@@ -36,13 +36,13 @@ jobs:
           $expected = @('Matrix Neon','Cyber Glass','Neon Dev','Stern HUD','Claude Code')
           if (@($template.profiles).Count -ne 5 -or @($template.schemes).Count -ne 5) { throw 'Attesi cinque profili e cinque schemi' }
           if (@($template.profiles | ForEach-Object guid | Select-Object -Unique).Count -ne 5) { throw 'GUID duplicati' }
-          foreach ($testProfile in $template.profiles) {
-            if ($profile.name -notin $expected) { throw "Profilo sconosciuto $($profile.name)" }
-            if ($profile.commandline -notmatch 'pwsh\.exe -NoLogo') { throw "Il profilo $($profile.name) non usa PowerShell 7" }
-            if ($profile.colorScheme -notin $template.schemes.name) { throw "Schema colore mancante $($profile.colorScheme)" }
-            if ($profile.icon -match '^\{\{ASSET_ROOT\}\}\\(.+)$') {
+          foreach ($terminalProfile in $template.profiles) {
+            if ($terminalProfile.name -notin $expected) { throw "Profilo sconosciuto $($terminalProfile.name)" }
+            if ($terminalProfile.commandline -notmatch 'pwsh\.exe -NoLogo') { throw "Il profilo $($terminalProfile.name) non usa PowerShell 7" }
+            if ($terminalProfile.colorScheme -notin $template.schemes.name) { throw "Schema colore mancante $($terminalProfile.colorScheme)" }
+            if ($terminalProfile.icon -match '^\{\{ASSET_ROOT\}\}\\(.+)$') {
               if (-not (Test-Path -LiteralPath (Join-Path 'assets' $Matches[1]) -PathType Leaf)) {
-                throw "Icona mancante: $($profile.icon)"
+                throw "Icona mancante: $($terminalProfile.icon)"
               }
             }
           }
