@@ -1,9 +1,9 @@
 [CmdletBinding()]
-param()
+param([string]$RuntimeRootOverride)
 
 $ErrorActionPreference = 'Stop'
 
-$runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+$runtimeRoot = if ($RuntimeRootOverride) { [IO.Path]::GetFullPath($RuntimeRootOverride) } else { Join-Path $env:LOCALAPPDATA 'PowerShellCustomizationPublic' }
 $sourceRoot = $PSScriptRoot
 
 function Write-TextIfChanged {
