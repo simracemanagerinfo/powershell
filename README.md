@@ -93,3 +93,5 @@ I comandi autonomi si scrivono in `commands\*.ps1`; `reload` sincronizza le nuov
 Non pubblicare token, file `*.local.ps1`, credenziali, impostazioni SSH o URL interni. La pipeline GitHub Actions esegue controlli sintattici, JSON, collegamenti dei profili, cronologia e una installazione conservativa su un runner Windows.
 
 > **Nota compatibilità:** la parte grafica è destinata a Windows Terminal su Windows. Linux e macOS richiedono un adattamento dell'host del terminale.
+
+La parte pubblica utilizza anche un modulo con nome distinto, `PowerShellCustomizationPublic.psm1`. I comandi condivisi (`reload`, `show`, ecc.) possono comunque sovrapporsi se si installano sia il repository personale sia quello pubblico **nello stesso profilo PowerShell**: la precedenza dipende dall'ordine di caricamento. I colleghi che installano solo la versione pubblica non hanno questa sovrapposizione.
