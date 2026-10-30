@@ -22,7 +22,7 @@ Al termine, **chiudi tutte le finestre di Windows Terminal e riaprilo**: finché
 
 ## I cinque launcher
 
-Dal menu Start, sotto **PowerShell Customization**, puoi aprire:
+Dal menu Start, sotto **PowerShell Customization Public**, puoi aprire:
 
 - **Matrix GPT.exe** — Matrix Neon, verde;
 - **Cyber Glass.exe** — sfondi a rotazione, trasparenze;
