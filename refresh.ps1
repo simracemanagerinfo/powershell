@@ -51,7 +51,7 @@ $moduleTarget = Join-Path $runtimeRoot 'PowerShellCustomizationPublic.psm1'
 $moduleContent = [IO.File]::ReadAllText($runtimeSource).TrimEnd("`r", "`n") +
     "`r`n`r`nExport-ModuleMember -Function * -Alias *`r`n"
 if (Write-TextIfChanged -Content $moduleContent -Destination $moduleTarget) {
-    $changed += 'PowerShellCustomization.psm1'
+    $changed += 'PowerShellCustomizationPublic.psm1'
 }
 
 $sourceMarker = Join-Path $runtimeRoot 'source-root.txt'
