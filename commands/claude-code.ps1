@@ -19,7 +19,7 @@ function claudeCode {
     }
 
     if ($Choose) {
-        & $terminal.Source -p 'Claude Code'
+        & $terminal.Source -p '{eb5c5fe4-d67f-48dd-a82d-022830817105}'
         return
     }
 
@@ -43,5 +43,5 @@ function claudeCode {
 
     # L'override del commandline mantiene il profilo grafico Windows Terminal e
     # salta soltanto il menu, aprendo Claude nella directory scelta.
-    & $terminal.Source -p 'Claude Code' -d $folder.FullName pwsh.exe -NoLogo -NoExit -NoProfile -File $startupScript -Theme claude_code -LaunchClaude -UseCurrentDirectory
+    & $terminal.Source -p '{eb5c5fe4-d67f-48dd-a82d-022830817105}' -d $folder.FullName pwsh.exe -NoLogo -NoExit -NoProfile -File $startupScript -Theme claude_code -LaunchClaude -UseCurrentDirectory
 }
