@@ -2,7 +2,7 @@
 #include <windows.h>
 #include <stdio.h>
 
-#define PROFILE_NAME L"Cyber Glass"
+#define PROFILE_NAME L"{eb5c5fe4-d67f-48dd-a82d-022830817102}"
 #define LAUNCHER_NAME L"Cyber Glass"
 
 static BOOL PrepareCyberGlassBackground(void);
@@ -36,7 +36,7 @@ static BOOL BuildRootPath(WCHAR *destination, DWORD capacity)
     if (length == 0 || length >= capacity) {
         return FALSE;
     }
-    return AppendChecked(destination, capacity, L"\\PowerShellCustomization\\assets\\backgrounds");
+    return AppendChecked(destination, capacity, L"\\PowerShellCustomizationPublic\\assets\\backgrounds");
 }
 
 static void ShowBackgroundError(const WCHAR *message, const WCHAR *path)
@@ -73,7 +73,7 @@ static BOOL PrepareCyberGlassBackground(void)
 {
     WCHAR backgroundRoot[BUFFER_CHARS];
     if (!BuildRootPath(backgroundRoot, BUFFER_CHARS)) {
-        ShowBackgroundError(L"Impossibile determinare la directory degli asset Cyber Glass.", L"%LOCALAPPDATA%\\PowerShellCustomization\\assets\\backgrounds");
+        ShowBackgroundError(L"Impossibile determinare la directory degli asset Cyber Glass.", L"%LOCALAPPDATA%\\PowerShellCustomizationPublic\\assets\\backgrounds");
         return FALSE;
     }
 

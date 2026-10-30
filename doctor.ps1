@@ -6,15 +6,12 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
-$runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+$runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomizationPublic'
 $assetRoot = Join-Path $runtimeRoot 'assets'
 $launcherRoot = Join-Path $runtimeRoot 'launchers'
 $terminalRuntimeRoot = Join-Path $runtimeRoot 'terminal'
-$terminalSettingsCandidates = @(
-    (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
-    (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json'),
-    (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
-)
+$fragmentRoot = Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomizationPublic'
+$fragment = Join-Path $fragmentRoot 'powershell-customization-public.json'
 $documents = [Environment]::GetFolderPath([Environment+SpecialFolder]::MyDocuments)
 $profilePath = if ([string]::IsNullOrWhiteSpace($ProfilePathOverride)) {
     Join-Path $documents 'PowerShell\Microsoft.PowerShell_profile.ps1'
@@ -23,7 +20,7 @@ else {
     [IO.Path]::GetFullPath($ProfilePathOverride)
 }
 $optionsPath = Join-Path $runtimeRoot 'install-options.json'
-$launcherNames = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD')
+$launcherNames = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code')
 $selectedLaunchers = @($launcherNames)
 if (Test-Path -LiteralPath $optionsPath -PathType Leaf) {
     try {
@@ -76,29 +73,28 @@ foreach ($registryPath in @(
 }
 Add-Result -Name 'MesloLGM Nerd Font' -Status $(if ($fontFound) { 'PASS' } else { 'WARN' }) -Details $(if ($fontFound) { 'Installato' } else { 'Non rilevato' })
 
-$terminalSettings = $terminalSettingsCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-Add-Result -Name 'Windows Terminal settings' -Status $(if ($terminalSettings) { 'PASS' } else { 'FAIL' }) -Details $terminalSettings
-if ($terminalSettings) {
+$fragmentFound = Test-Path -LiteralPath $fragment -PathType Leaf
+Add-Result -Name 'Windows Terminal fragment' -Status $(if ($fragmentFound) { 'PASS' } else { 'FAIL' }) -Details $fragment
+if ($fragmentFound) {
     try {
-        $terminalJson = [IO.File]::ReadAllText($terminalSettings) | ConvertFrom-Json
-        $graphicalNames = @('Matrix Neon', 'Cyber Glass', 'Neon Dev', 'Stern HUD')
-        $powerShell7Profiles = @($terminalJson.profiles.list | Where-Object {
-            [string]$_.name -in $graphicalNames -and [string]$_.commandline -match '^pwsh\.exe\s'
-        })
-        Add-Result -Name 'Profili Windows Terminal' -Status $(if ($powerShell7Profiles.Count -eq 4) { 'PASS' } else { 'FAIL' }) -Details "Profili rilevati: $($powerShell7Profiles.Count)/4"
-        Add-Result -Name 'Profili grafici PowerShell 7' -Status $(if ($powerShell7Profiles.Count -eq $graphicalNames.Count) { 'PASS' } else { 'FAIL' }) `
-            -Details "Profili pwsh.exe: $($powerShell7Profiles.Count)/$($graphicalNames.Count)"
-        $homeProfiles = @($powerShell7Profiles | Where-Object { [string]$_.startingDirectory -eq '%USERPROFILE%' })
-        Add-Result -Name 'Directory iniziale profili' -Status $(if ($homeProfiles.Count -eq $graphicalNames.Count) { 'PASS' } else { 'FAIL' }) `
-            -Details "Profili nella home utente: $($homeProfiles.Count)/$($graphicalNames.Count)"
+        $json = [IO.File]::ReadAllText($fragment) | ConvertFrom-Json -ErrorAction Stop
+        $expectedNames = @('Matrix Neon','Cyber Glass','Neon Dev','Stern HUD','Claude Code')
+        $profiles = @($json.profiles | Where-Object { $_.name -in $expectedNames })
+        $ids = @($profiles | ForEach-Object { [string]$_.guid } | Select-Object -Unique)
+        $schemes = @($json.schemes | ForEach-Object { [string]$_.name })
+        $valid = $profiles.Count -eq 5 -and $ids.Count -eq 5 -and
+            @($json.schemes).Count -eq 5 -and 'claude_code_neon' -in $schemes
+        Add-Result -Name 'Profili grafici Windows Terminal' -Status $(if ($valid) { 'PASS' } else { 'FAIL' }) -Details "Profili: $($profiles.Count)/5"
     }
     catch {
-        Add-Result -Name 'Profili Windows Terminal' -Status 'FAIL' -Details $_.Exception.Message
+        Add-Result -Name 'Profili grafici Windows Terminal' -Status 'FAIL' -Details $_.Exception.Message
     }
 }
 else {
-    Add-Result -Name 'Profili Windows Terminal' -Status 'FAIL' -Details 'settings.json non disponibile'
+    Add-Result -Name 'Profili grafici Windows Terminal' -Status 'FAIL' -Details 'Esegui setup.ps1'
 }
+$selectorPath = Join-Path $terminalRuntimeRoot 'Select-ClaudeProject.ps1'
+Add-Result -Name 'Selettore progetti Claude' -Status $(if (Test-Path -LiteralPath $selectorPath -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $selectorPath
 
 foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hlsl')) {
     $path = Join-Path $terminalRuntimeRoot "shaders\$shader"
@@ -108,7 +104,7 @@ foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hls
 foreach ($asset in @(
     'icons\matrix_gpt.ico',
     'icons\matrix_gpt_clear.ico',
-    'icons\svi_gpt.ico',
+    'icons\svi_gpt_original.ico',
     'icons\stern_logs.ico',
     'watermarks\svi_gpt.png',
     'watermarks\stern_logs.png',
@@ -121,6 +117,11 @@ foreach ($asset in @(
     'backgrounds\current.png')) {
     $path = Join-Path $assetRoot $asset
     Add-Result -Name "Asset $asset" -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
+}
+
+foreach ($theme in @('matrix_neon_gpt','cyber_glass_gpt','neon_dev_gpt','stern_hud_gpt','claude_code')) {
+    $path = Join-Path $terminalRuntimeRoot "themes\$theme.omp.json"
+    Add-Result -Name "Oh My Posh $theme" -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
 }
 
 foreach ($launcher in $launcherNames) {

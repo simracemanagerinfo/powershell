@@ -1,0 +1,71 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "version": 4,
+  "final_space": true,
+  "console_title_template": "CLAUDE CODE // {{.PWD}}",
+  "blocks": [
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "segments": [
+        {
+          "type": "text",
+          "style": "plain",
+          "foreground": "#D97757",
+          "template": "CLAUDE "
+        },
+        {
+          "type": "path",
+          "style": "plain",
+          "foreground": "#F4DDD0",
+          "options": {
+            "style": "full"
+          },
+          "template": "{{ .Path }}"
+        },
+        {
+          "type": "git",
+          "style": "plain",
+          "foreground": "#EAAF8B",
+          "template": "   <#EAAF8B>{{ .HEAD }}</>{{ if .Staging.Changed }} <#B9DBA2>+{{ .Staging.String }}</>{{ end }}{{ if .Working.Changed }} <#F3A39A>*{{ .Working.String }}</>{{ end }}"
+        },
+        {
+          "type": "status",
+          "style": "plain",
+          "foreground": "#D97757",
+          "foreground_templates": [
+            "{{ if gt .Code 0 }}#F3A39A{{ end }}"
+          ],
+          "options": {
+            "always_enabled": true
+          },
+          "template": " ❯ "
+        }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "right",
+      "segments": [
+        {
+          "type": "executiontime",
+          "style": "plain",
+          "foreground": "#99847A",
+          "options": {
+            "threshold": 500
+          },
+          "template": "{{ .FormattedMs }} "
+        },
+        {
+          "type": "time",
+          "style": "plain",
+          "foreground": "#E4C0AA",
+          "options": {
+            "time_format": "15:04"
+          },
+          "template": "{{ .CurrentDate | date .Format }}"
+        }
+      ]
+    }
+  ]
+}

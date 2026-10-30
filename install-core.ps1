@@ -2,6 +2,8 @@
 param(
     [switch]$SkipDependencies,
     [switch]$Reconfigure,
+    [ValidateSet('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code')]
+    [string[]]$AddLauncher,
 
     [Parameter(DontShow)]
     [AllowNull()]
@@ -39,20 +41,20 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 }
 
 $script:RuntimeRoot = if ([string]::IsNullOrWhiteSpace($RuntimeRootOverride)) {
-    Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+    Join-Path $env:LOCALAPPDATA 'PowerShellCustomizationPublic'
 }
 else { [IO.Path]::GetFullPath($RuntimeRootOverride) }
 $script:AssetRoot = Join-Path $script:RuntimeRoot 'assets'
 $script:LauncherRoot = Join-Path $script:RuntimeRoot 'launchers'
 $script:TerminalRuntimeRoot = Join-Path $script:RuntimeRoot 'terminal'
 $script:FragmentRoot = if ([string]::IsNullOrWhiteSpace($FragmentRootOverride)) {
-    Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomization'
+    Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\Fragments\PowerShellCustomizationPublic'
 }
 else { [IO.Path]::GetFullPath($FragmentRootOverride) }
 $script:OptionsPath = Join-Path $script:RuntimeRoot 'install-options.json'
 $script:BinRoot = Join-Path $script:RuntimeRoot 'bin'
 $script:Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$script:LauncherNames = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD')
+$script:LauncherNames = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code')
 
 function Read-YesNo {
     param(
@@ -133,47 +135,42 @@ function Ensure-WingetApplication {
     param(
         [Parameter(Mandatory)][string]$Name,
         [Parameter(Mandatory)][string]$Command,
-        [Parameter(Mandatory)][string]$WingetId
+        [Parameter(Mandatory)][string]$WingetId,
+        [switch]$Optional
     )
 
+    Refresh-ProcessPath
     if (Get-Command $Command -ErrorAction SilentlyContinue) {
         Write-Host "[OK] $Name" -ForegroundColor Green
         return $true
     }
-
-    if (-not (Read-YesNo -Prompt "$Name non trovato. Vuoi provare l'installazione per il solo utente corrente? [S/N]" -Default $true)) {
-        Write-Warning "$Name non installato."
-        return $false
-    }
-
-    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
+    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $winget) {
-        Write-Warning "winget non disponibile: impossibile installare automaticamente $Name senza privilegi amministrativi."
-        return $false
+        if ($Optional) { Write-Warning "Impossibile installare $Name senza WinGet."; return $false }
+        throw "WinGet non disponibile. Richiedi Microsoft App Installer all'IT."
     }
 
-    Write-Host "Installazione user-level: $Name" -ForegroundColor Cyan
-    & $winget.Source install --id $WingetId --exact --scope user --accept-package-agreements --accept-source-agreements --silent
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Installazione user-level fallita per $Name. Non verrà tentata automaticamente un'installazione elevata."
-        return $false
+    Write-Host "[SETUP] Installo $Name per l'utente corrente..." -ForegroundColor Cyan
+    & $winget.Source install --id $WingetId --exact --scope user --accept-package-agreements --accept-source-agreements --disable-interactivity --silent
+    $code = $LASTEXITCODE
+    if ($code -ne 0) {
+        if ($Optional) { Write-Warning "Installazione opzionale $Name fallita ($code)."; return $false }
+        throw "Installazione $Name fallita ($code). Potrebbe essere bloccata dai criteri aziendali."
     }
-
     Refresh-ProcessPath
+    if (-not (Get-Command $Command -ErrorAction SilentlyContinue)) {
+        if ($Optional) { Write-Warning "$Name non ancora nel PATH."; return $false }
+        throw "$Name non rilevato dopo il setup. Apri una nuova shell e riprova."
+    }
     return $true
 }
 
 function Ensure-PowerShellModule {
     param([Parameter(Mandatory)][string]$Name)
-
-    if (Get-Module -ListAvailable -Name $Name) {
-        Write-Host "[OK] Modulo $Name" -ForegroundColor Green
-        return
-    }
-    if (-not (Read-YesNo -Prompt "Modulo $Name non trovato. Installarlo in CurrentUser? [S/N]" -Default $true)) {
-        return
-    }
-    Install-Module -Name $Name -Scope CurrentUser -Repository PSGallery -Force -AllowClobber
+    if (Get-Module -ListAvailable -Name $Name) { Write-Host "[OK] Modulo $Name" -ForegroundColor Green; return }
+    Write-Host "[SETUP] Installa modulo $Name in CurrentUser..." -ForegroundColor Cyan
+    Install-Module -Name $Name -Scope CurrentUser -Repository PSGallery -Force -AllowClobber -ErrorAction Stop
+    if (-not (Get-Module -ListAvailable -Name $Name)) { throw "Installazione modulo $Name fallita." }
 }
 
 function Test-MesloFont {
@@ -195,20 +192,15 @@ function Ensure-MesloFont {
         Write-Host '[OK] MesloLGM Nerd Font' -ForegroundColor Green
         return
     }
-    if (-not (Read-YesNo -Prompt 'MesloLGM Nerd Font non trovato. Installarlo per il solo utente corrente? [S/N]' -Default $true)) {
-        return
-    }
-
     Refresh-ProcessPath
     $omp = Get-Command oh-my-posh.exe -ErrorAction SilentlyContinue | Select-Object -First 1
     if (-not $omp) {
-        Write-Warning 'Oh My Posh non è disponibile nella sessione: impossibile installare automaticamente Meslo.'
-        return
+        throw 'Oh My Posh non disponibile per installare il font Meslo.'
     }
 
     & $omp.Source font install meslo
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning 'Installazione Meslo Nerd Font non riuscita.'
+        throw 'Installazione Meslo Nerd Font non riuscita.'
     }
 }
 
@@ -272,34 +264,29 @@ function Ensure-OcClient {
 }
 
 function Get-InstallOptions {
-    if (-not $Reconfigure -and $null -eq $OpenShiftSternOverride -and $null -eq $LaunchersOverride -and
-        (Test-Path -LiteralPath $script:OptionsPath -PathType Leaf)) {
-        try {
-            $saved = [IO.File]::ReadAllText($script:OptionsPath) | ConvertFrom-Json
-            if ($saved.PSObject.Properties['OpenShiftStern'] -and $saved.PSObject.Properties['Launchers']) {
-                return [pscustomobject]@{
-                    OpenShiftStern = [bool]$saved.OpenShiftStern
-                    Launchers      = @(Resolve-LauncherSelection -Names @($saved.Launchers))
-                }
-            }
-        }
-        catch { }
+    # Prima installazione senza domande: tutte le grafiche, feature aziendali disabilitate.
+    $saved = $null
+    if (Test-Path -LiteralPath $script:OptionsPath -PathType Leaf) {
+        try { $saved = [IO.File]::ReadAllText($script:OptionsPath) | ConvertFrom-Json }
+        catch { Write-Warning 'Opzioni precedenti non leggibili: applico i default sicuri.' }
     }
 
-    return [pscustomobject]@{
-        OpenShiftStern = if ($null -ne $OpenShiftSternOverride) {
-            [bool]$OpenShiftSternOverride
-        }
-        else {
-            Read-YesNo -Prompt 'Ti serve il supporto OpenShift / Stern? [S/N]' -Default $false
-        }
-        Launchers = if ($null -ne $LaunchersOverride) {
-            @(Resolve-LauncherSelection -Names $LaunchersOverride)
-        }
-        else {
-            @(Read-LauncherSelection)
-        }
+    $openShift = if ($saved -and $saved.PSObject.Properties['OpenShiftStern']) { [bool]$saved.OpenShiftStern } else { $false }
+    $launchers = if ($saved -and $saved.PSObject.Properties['Launchers']) {
+        @(Resolve-LauncherSelection -Names @($saved.Launchers))
     }
+    else { @($script:LauncherNames) }
+
+    if ($Reconfigure) {
+        $openShift = Read-YesNo -Prompt 'Abilitare OpenShift/Stern? [S/N]' -Default $openShift
+        $launchers = @(Read-LauncherSelection)
+    }
+    if ($null -ne $OpenShiftSternOverride) { $openShift = [bool]$OpenShiftSternOverride }
+    if ($null -ne $LaunchersOverride) { $launchers = @(Resolve-LauncherSelection -Names $LaunchersOverride) }
+    if ($AddLauncher.Count -gt 0) {
+        $launchers = @(Resolve-LauncherSelection -Names (@($launchers) + @($AddLauncher)))
+    }
+    return [pscustomobject]@{ OpenShiftStern = $openShift; Launchers = @($launchers) }
 }
 
 function Save-InstallOptions {
@@ -310,6 +297,8 @@ function Save-InstallOptions {
             OpenShiftStern = [bool]$Options.OpenShiftStern
             Launchers      = @($Options.Launchers)
         } | ConvertTo-Json) + [Environment]::NewLine
+    if ((Test-Path -LiteralPath $script:OptionsPath -PathType Leaf) -and
+        [IO.File]::ReadAllText($script:OptionsPath) -ceq $json) { return }
     [IO.File]::WriteAllText($script:OptionsPath, $json, [Text.UTF8Encoding]::new($false))
 }
 
@@ -321,6 +310,7 @@ function Copy-TextFileUtf8 {
 
     New-Item -ItemType Directory -Path (Split-Path -Parent $Destination) -Force | Out-Null
     $content = [IO.File]::ReadAllText($Source)
+    if ((Test-Path -LiteralPath $Destination -PathType Leaf) -and [IO.File]::ReadAllText($Destination) -ceq $content) { return }
     [IO.File]::WriteAllText($Destination, $content, [Text.UTF8Encoding]::new($false))
 }
 
@@ -369,12 +359,8 @@ function Update-ManagedProfileBlock {
     $endMarker = '# <<< powershell-customization managed <<<'
     $managedBlock = (@"
 $startMarker
-`$runtimeRoot = Join-Path `$env:LOCALAPPDATA 'PowerShellCustomization'
+`$runtimeRoot = Join-Path `$env:LOCALAPPDATA 'PowerShellCustomizationPublic'
 . (Join-Path `$runtimeRoot 'common.ps1')
-`$openShiftFeature = Join-Path `$runtimeRoot 'openshift-stern.ps1'
-if (Test-Path -LiteralPath `$openShiftFeature -PathType Leaf) {
-    . `$openShiftFeature
-}
 $endMarker
 "@).TrimEnd("`r", "`n")
 
@@ -439,145 +425,74 @@ function Install-RuntimeFiles {
 
 function Install-Graphics {
     $sourceRoot = Join-Path $PSScriptRoot 'assets'
-    $requiredAssets = @(
-        'backgrounds\pool\01_roma_vaticano_neon.png',
-        'backgrounds\pool\02_simrace_pitlane_neon.png',
-        'backgrounds\pool\03_roma_colosseo_future.png',
-        'backgrounds\pool\04_simrace_garage_future.png',
-        'backgrounds\pool\05_roma_colosseo_rain.png',
-        'backgrounds\pool\06_simrace_night_race.png',
-        'icons\matrix_gpt.ico',
-        'icons\matrix_gpt_clear.ico',
-        'icons\svi_gpt.ico',
-        'icons\stern_logs.ico',
-        'watermarks\svi_gpt.png',
-        'watermarks\stern_logs.png'
-    )
-
-    foreach ($relativePath in $requiredAssets) {
-        $source = Join-Path $sourceRoot $relativePath
-        if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
-            throw "Asset versionato mancante: $source"
-        }
-
-        $destination = Join-Path $script:AssetRoot $relativePath
+    foreach ($source in Get-ChildItem -LiteralPath $sourceRoot -Recurse -File) {
+        $relative = [IO.Path]::GetRelativePath($sourceRoot, $source.FullName)
+        $destination = Join-Path $script:AssetRoot $relative
         New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
-        Copy-Item -LiteralPath $source -Destination $destination -Force
+        if ((Test-Path -LiteralPath $destination -PathType Leaf) -and
+            (Get-FileHash -LiteralPath $source.FullName -Algorithm SHA256).Hash -eq
+            (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash) { continue }
+        Copy-Item -LiteralPath $source.FullName -Destination $destination -Force
     }
-
-    $initialBackground = Join-Path $script:AssetRoot 'backgrounds\pool\01_roma_vaticano_neon.png'
-    Copy-Item -LiteralPath $initialBackground -Destination (Join-Path $script:AssetRoot 'backgrounds\current.png') -Force
+    $current = Join-Path $script:AssetRoot 'backgrounds\current.png'
+    if (-not (Test-Path -LiteralPath $current -PathType Leaf)) {
+        Copy-Item -LiteralPath (Join-Path $script:AssetRoot 'backgrounds\pool\01_roma_vaticano_neon.png') -Destination $current
+    }
 }
 
-function Resolve-WindowsTerminalSettingsPath {
-    if (-not [string]::IsNullOrWhiteSpace($TerminalSettingsPathOverride)) {
-        return [IO.Path]::GetFullPath($TerminalSettingsPathOverride)
-    }
-
-    $candidates = @(
-        (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json'),
-        (Join-Path $env:LOCALAPPDATA 'Packages\Microsoft.WindowsTerminalPreview_8wekyb3d8bbwe\LocalState\settings.json'),
-        (Join-Path $env:LOCALAPPDATA 'Microsoft\Windows Terminal\settings.json')
-    )
-    $existing = $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-    if ($existing) { return $existing }
-
-    throw 'settings.json di Windows Terminal non trovato. Avvia Windows Terminal almeno una volta e rilancia install.ps1.'
-}
-
-function Install-WindowsTerminalProfiles {
+function Install-WindowsTerminalFragment {
+    # Fragment gestito senza riscrivere i settings.json di Windows Terminal.
+    New-Item -ItemType Directory -Path $script:FragmentRoot -Force | Out-Null
     New-Item -ItemType Directory -Path $script:TerminalRuntimeRoot -Force | Out-Null
 
-    Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot 'cybergpt\Start-CyberProfile.ps1') -Destination (Join-Path $script:TerminalRuntimeRoot 'Start-CyberProfile.ps1')
-
-    $themeDir = Join-Path $script:TerminalRuntimeRoot 'themes'
-    New-Item -ItemType Directory -Path $themeDir -Force | Out-Null
-    foreach ($theme in @('matrix_neon_gpt.omp.json', 'cyber_glass_gpt.omp.json', 'neon_dev_gpt.omp.json', 'stern_hud_gpt.omp.json')) {
-        Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot "cybergpt\themes\$theme") -Destination (Join-Path $themeDir $theme)
+    foreach ($file in @('Start-CyberProfile.ps1','Select-ClaudeProject.ps1')) {
+        Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot "cybergpt\$file") -Destination (Join-Path $script:TerminalRuntimeRoot $file)
     }
-
-    $shaderDir = Join-Path $script:TerminalRuntimeRoot 'shaders'
-    New-Item -ItemType Directory -Path $shaderDir -Force | Out-Null
-    foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hlsl')) {
-        Copy-TextFileUtf8 -Source (Join-Path $PSScriptRoot "cybergpt\shaders\$shader") -Destination (Join-Path $shaderDir $shader)
+    foreach ($folder in @('themes','shaders')) {
+        foreach ($file in Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot "cybergpt\$folder") -File) {
+            Copy-TextFileUtf8 -Source $file.FullName -Destination (Join-Path $script:TerminalRuntimeRoot "$folder\$($file.Name)")
+        }
     }
 
     $template = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'windows-terminal\managed-settings.json'))
-    $terminalJsonRoot = $script:TerminalRuntimeRoot.Replace('\', '\\')
-    $assetJsonRoot = $script:AssetRoot.Replace('\', '\\')
-    $rendered = $template.Replace('{{RUNTIME_ROOT}}', $terminalJsonRoot).Replace('{{ASSET_ROOT}}', $assetJsonRoot)
-
-    $validated = $rendered | ConvertFrom-Json
-
-    $settingsPath = Resolve-WindowsTerminalSettingsPath
-    $settingsDirectory = Split-Path -Parent $settingsPath
-    New-Item -ItemType Directory -Path $settingsDirectory -Force | Out-Null
-    $settings = if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
-        [IO.File]::ReadAllText($settingsPath) | ConvertFrom-Json
-    }
-    else {
-        [pscustomobject]@{}
+    $rootJson = $script:TerminalRuntimeRoot.Replace('\', '\\')
+    $assetJson = $script:AssetRoot.Replace('\', '\\')
+    $rendered = $template.Replace('{{RUNTIME_ROOT}}', $rootJson).Replace('{{ASSET_ROOT}}', $assetJson)
+    $validated = $rendered | ConvertFrom-Json -ErrorAction Stop
+    if (@($validated.profiles).Count -ne 5 -or @($validated.schemes).Count -ne 5) {
+        throw 'Fragment Windows Terminal incompleto (attesi 5 profili e 5 schemi).'
     }
 
-    if (-not $settings.PSObject.Properties['profiles'] -or $settings.profiles -is [array]) {
-        $legacyProfiles = if ($settings.PSObject.Properties['profiles']) { @($settings.profiles) } else { @() }
-        if ($settings.PSObject.Properties['profiles']) { $settings.PSObject.Properties.Remove('profiles') }
-        $settings | Add-Member -NotePropertyName profiles -NotePropertyValue ([pscustomobject]@{ list = $legacyProfiles })
+    $json = ($validated | ConvertTo-Json -Depth 100) + [Environment]::NewLine
+    $destination = Join-Path $script:FragmentRoot 'powershell-customization-public.json'
+    if (-not (Test-Path -LiteralPath $destination -PathType Leaf) -or
+        [IO.File]::ReadAllText($destination) -cne $json) {
+        [IO.File]::WriteAllText($destination, $json, [Text.UTF8Encoding]::new($false))
     }
-    elseif (-not $settings.profiles.PSObject.Properties['list']) {
-        $settings.profiles | Add-Member -NotePropertyName list -NotePropertyValue @()
-    }
-    if (-not $settings.PSObject.Properties['schemes']) {
-        $settings | Add-Member -NotePropertyName schemes -NotePropertyValue @()
-    }
-
-    $managedGuids = @($validated.profiles | ForEach-Object { [string]$_.guid })
-    $managedNames = @(
-        'Matrix Neon', 'Cyber Glass', 'Neon Dev', 'Stern HUD',
-        'matrix_neon_gpt', 'cyber_glass_gpt', 'neon_dev_gpt', 'stern_hud_gpt'
-    )
-    $keptProfiles = @($settings.profiles.list | Where-Object {
-            [string]$_.guid -notin $managedGuids -and [string]$_.name -notin $managedNames
-        })
-    $managedSchemeNames = @($validated.schemes | ForEach-Object { [string]$_.name })
-    $keptSchemes = @($settings.schemes | Where-Object { [string]$_.name -notin $managedSchemeNames })
-    $settings.profiles.list = @($keptProfiles) + @($validated.profiles)
-    $settings.schemes = @($keptSchemes) + @($validated.schemes)
-
-    if (Test-Path -LiteralPath $settingsPath -PathType Leaf) {
-        $backupPath = "$settingsPath.powershell-customization-backup-$($script:Timestamp)"
-        Copy-Item -LiteralPath $settingsPath -Destination $backupPath -Force
-        Write-Host "Backup Windows Terminal: $backupPath" -ForegroundColor Cyan
-    }
-
-    $json = ($settings | ConvertTo-Json -Depth 100) + [Environment]::NewLine
-    $temporaryPath = "$settingsPath.powershell-customization-new-$PID"
-    [IO.File]::WriteAllText($temporaryPath, $json, [Text.UTF8Encoding]::new($false))
-    try {
-        $written = [IO.File]::ReadAllText($temporaryPath) | ConvertFrom-Json
-        if (@($written.profiles.list | Where-Object { [string]$_.guid -in $managedGuids }).Count -ne $managedGuids.Count) {
-            throw 'Verifica dei profili Windows Terminal non riuscita.'
-        }
-        Move-Item -LiteralPath $temporaryPath -Destination $settingsPath -Force
-    }
-    finally {
-        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
-            Remove-Item -LiteralPath $temporaryPath -Force
-        }
-    }
-
-    if (Test-Path -LiteralPath $script:FragmentRoot -PathType Container) {
-        Remove-Item -LiteralPath $script:FragmentRoot -Recurse -Force
-    }
-
-    $script:TerminalSettingsPath = $settingsPath
 }
 
 function Build-Launchers {
     param([Parameter(Mandatory)][string[]]$Names)
 
     $buildScript = Join-Path $PSScriptRoot 'launchers\src\build.ps1'
+    $state = Join-Path $script:LauncherRoot '.build-state.json'
+    $parts = @($Names | Sort-Object)
+    $parts += Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'launchers\src') -File | Sort-Object Name |
+        ForEach-Object { "$($_.Name):$((Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash)" }
+    $fingerprint = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($parts -join "`n"))))
+    $found = @($Names | Where-Object { -not (Test-Path -LiteralPath (Join-Path $script:LauncherRoot "$_.exe") -PathType Leaf) })
+    if ($found.Count -eq 0 -and (Test-Path -LiteralPath $state -PathType Leaf)) {
+        try {
+            if (([IO.File]::ReadAllText($state) | ConvertFrom-Json).Fingerprint -ceq $fingerprint) {
+                Write-Host '[OK] Launcher gia compilati.' -ForegroundColor Green
+                return
+            }
+        }
+        catch { }
+    }
     & $buildScript -OutputDirectory $script:LauncherRoot -AssetRoot $script:AssetRoot -Launchers $Names | Out-Host
+    if (-not $?) { throw 'Compilazione dei launcher fallita.' }
+    [IO.File]::WriteAllText($state, (([pscustomobject]@{ Fingerprint = $fingerprint } | ConvertTo-Json) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
 
     foreach ($name in $Names) {
         $path = Join-Path $script:LauncherRoot "$name.exe"
@@ -591,7 +506,7 @@ function Install-LauncherShortcuts {
     param([Parameter(Mandatory)][string[]]$Names)
 
     $startMenuRoot = if ([string]::IsNullOrWhiteSpace($StartMenuRootOverride)) {
-        Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\PowerShell Customization'
+        Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\PowerShell Customization Public'
     }
     else { [IO.Path]::GetFullPath($StartMenuRootOverride) }
     New-Item -ItemType Directory -Path $startMenuRoot -Force | Out-Null
@@ -631,13 +546,13 @@ if (-not $SkipDependencies) {
 
     if ($options.OpenShiftStern) {
         Ensure-OcClient | Out-Null
-        Ensure-WingetApplication -Name 'Stern' -Command 'stern.exe' -WingetId 'stern.stern' | Out-Null
+        Ensure-WingetApplication -Name 'Stern' -Command 'stern.exe' -WingetId 'stern.stern' -Optional | Out-Null
     }
 }
 
 Install-RuntimeFiles -Options $options
 Install-Graphics
-Install-WindowsTerminalProfiles
+Install-WindowsTerminalFragment
 Build-Launchers -Names $options.Launchers
 Install-LauncherShortcuts -Names $options.Launchers
 
@@ -654,7 +569,7 @@ Write-Host ''
 Write-Host 'Installazione completata.' -ForegroundColor Green
 Write-Host "Profilo PowerShell 7: $powerShell7Profile"
 Write-Host "Asset PNG/ICO: $script:AssetRoot"
-Write-Host "Windows Terminal settings: $script:TerminalSettingsPath"
+Write-Host "Windows Terminal fragment: $script:FragmentRoot"
 Write-Host "Launcher EXE: $script:LauncherRoot"
 Write-Host "Creati: $((@($options.Launchers) | ForEach-Object { "$_.exe" }) -join ', ')" -ForegroundColor Green
 Write-Host 'Il contenuto preesistente del profilo PowerShell non viene sovrascritto.' -ForegroundColor Cyan

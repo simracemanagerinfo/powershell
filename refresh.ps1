@@ -1,9 +1,9 @@
 [CmdletBinding()]
-param()
+param([string]$RuntimeRootOverride)
 
 $ErrorActionPreference = 'Stop'
 
-$runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+$runtimeRoot = if ($RuntimeRootOverride) { [IO.Path]::GetFullPath($RuntimeRootOverride) } else { Join-Path $env:LOCALAPPDATA 'PowerShellCustomizationPublic' }
 $sourceRoot = $PSScriptRoot
 
 function Write-TextIfChanged {
@@ -47,11 +47,11 @@ foreach ($fileName in @('common.ps1', 'bootstrap.ps1')) {
 }
 
 $runtimeSource = Join-Path $sourceRoot 'profiles\common\runtime.ps1'
-$moduleTarget = Join-Path $runtimeRoot 'PowerShellCustomization.psm1'
+$moduleTarget = Join-Path $runtimeRoot 'PowerShellCustomizationPublic.psm1'
 $moduleContent = [IO.File]::ReadAllText($runtimeSource).TrimEnd("`r", "`n") +
     "`r`n`r`nExport-ModuleMember -Function * -Alias *`r`n"
 if (Write-TextIfChanged -Content $moduleContent -Destination $moduleTarget) {
-    $changed += 'PowerShellCustomization.psm1'
+    $changed += 'PowerShellCustomizationPublic.psm1'
 }
 
 $sourceMarker = Join-Path $runtimeRoot 'source-root.txt'

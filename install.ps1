@@ -3,6 +3,9 @@ param(
     [switch]$SkipDependencies,
     [switch]$Reconfigure,
 
+    [ValidateSet('Matrix GPT','Cyber Glass','Neon Dev','Stern HUD','Claude Code')]
+    [string[]]$AddLauncher,
+
     [Parameter(DontShow)]
     [AllowNull()]
     [Nullable[bool]]$OpenShiftSternOverride,
@@ -36,6 +39,7 @@ $ErrorActionPreference = 'Stop'
 
 $scriptPath = $MyInvocation.MyCommand.Path
 $corePath = Join-Path $PSScriptRoot 'install-core.ps1'
+$refreshPath = Join-Path $PSScriptRoot 'refresh.ps1'
 $forwardParameters = @{}
 foreach ($key in $PSBoundParameters.Keys) {
     $forwardParameters[$key] = $PSBoundParameters[$key]
@@ -235,10 +239,12 @@ if (-not (Test-Path -LiteralPath $corePath -PathType Leaf)) {
     throw "Installer core mancante: $corePath"
 }
 
-if (-not $SkipDependencies) {
+if (-not $SkipDependencies -and -not (Resolve-BootstrapCommand -Name 'wt.exe')) {
     $winget = Get-WinGetPath
     Ensure-WindowsTerminalBootstrap -WingetPath $winget | Out-Null
 }
 
 & $corePath @forwardParameters
+if ($RuntimeRootOverride) { & $refreshPath -RuntimeRootOverride $RuntimeRootOverride }
+else { & $refreshPath }
 Assert-BaseRuntime
