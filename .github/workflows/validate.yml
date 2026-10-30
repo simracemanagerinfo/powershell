@@ -36,7 +36,7 @@ jobs:
           $expected = @('Matrix Neon','Cyber Glass','Neon Dev','Stern HUD','Claude Code')
           if (@($template.profiles).Count -ne 5 -or @($template.schemes).Count -ne 5) { throw 'Attesi cinque profili e cinque schemi' }
           if (@($template.profiles | ForEach-Object guid | Select-Object -Unique).Count -ne 5) { throw 'GUID duplicati' }
-          foreach ($profile in $template.profiles) {
+          foreach ($testProfile in $template.profiles) {
             if ($profile.name -notin $expected) { throw "Profilo sconosciuto $($profile.name)" }
             if ($profile.commandline -notmatch 'pwsh\.exe -NoLogo') { throw "Il profilo $($profile.name) non usa PowerShell 7" }
             if ($profile.colorScheme -notin $template.schemes.name) { throw "Schema colore mancante $($profile.colorScheme)" }
@@ -84,33 +84,31 @@ jobs:
         shell: pwsh
         run: |
           $base = Join-Path $env:RUNNER_TEMP 'public-install-test'
-          $profile = Join-Path $base 'PowerShell/Microsoft.PowerShell_profile.ps1'
+          $testProfile = Join-Path $base 'PowerShell/Microsoft.PowerShell_profile.ps1'
           $runtime = Join-Path $base 'runtime'
           $fragment = Join-Path $base 'fragments'
           $startMenu = Join-Path $base 'start'
-          New-Item -ItemType Directory -Path (Split-Path -Parent $profile) -Force | Out-Null
+          New-Item -ItemType Directory -Path (Split-Path -Parent $testProfile) -Force | Out-Null
           $encoding = [Text.UnicodeEncoding]::new($false,$true)
           $original = @'
           # FILE DEL COLLEGA - PRESERVARE
           function Test-ColleagueFunction { 'SAFE' }
           '@
-          [IO.File]::WriteAllText($profile,$original,$encoding)
+          [IO.File]::WriteAllText($testProfile,$original,$encoding)
 
           $args = @{
             SkipDependencies = $true
-            OpenShiftSternOverride = $false
-            ProfilePathOverride = $profile
-            LaunchersOverride = @('Matrix GPT','Cyber Glass','Neon Dev','Stern HUD','Claude Code')
+            ProfilePathOverride = $testProfile
             RuntimeRootOverride = $runtime
             FragmentRootOverride = $fragment
             StartMenuRootOverride = $startMenu
           }
           & ./install.ps1 @args
 
-          $result = [IO.File]::ReadAllText($profile,$encoding)
+          $result = [IO.File]::ReadAllText($testProfile,$encoding)
           if (-not $result.Contains($original.Trim())) { throw 'Contenuto del profilo perso.' }
           if ($result -notmatch '# >>> powershell-customization managed >>>') { throw 'Blocco managed mancante.' }
-          $bytes = [IO.File]::ReadAllBytes($profile)
+          $bytes = [IO.File]::ReadAllBytes($testProfile)
           if ($bytes[0] -ne 0xFF -or $bytes[1] -ne 0xFE) { throw 'BOM UTF-16 modificato.' }
           $fragmentFile = Join-Path $fragment 'powershell-customization-public.json'
           if (-not (Test-Path $fragmentFile)) { throw 'Fragment pubblico mancante.' }
@@ -121,8 +119,8 @@ jobs:
               throw "Launcher mancante: $launcher"
             }
           }
-          $digestBefore = (Get-FileHash $profile -Algorithm SHA256).Hash
+          $digestBefore = (Get-FileHash $testProfile -Algorithm SHA256).Hash
           & ./install.ps1 @args
-          $digestAfter = (Get-FileHash $profile -Algorithm SHA256).Hash
+          $digestAfter = (Get-FileHash $testProfile -Algorithm SHA256).Hash
           if ($digestBefore -ne $digestAfter) { throw 'Seconda installazione non idempotente.' }
-          if (-not (Test-Path (Join-Path $runtime 'PowerShellCustomization.psm1'))) { throw 'Modulo di reload mancante.' }
+          if (-not (Test-Path (Join-Path $runtime 'PowerShellCustomizationPublic.psm1'))) { throw 'Modulo di reload mancante.' }
