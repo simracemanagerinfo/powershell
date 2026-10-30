@@ -2,13 +2,13 @@
 # reload vive nello scope globale; i comandi personalizzati vivono nel modulo runtime.
 
 $runtimeRoot = $PSScriptRoot
-$modulePath = Join-Path $runtimeRoot 'PowerShellCustomization.psm1'
+$modulePath = Join-Path $runtimeRoot 'PowerShellCustomizationPublic.psm1'
 
 function global:reload {
     [CmdletBinding()]
     param([switch]$ProfileOnly)
 
-    $runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization'
+    $runtimeRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomizationPublic'
     $markerPath = Join-Path $runtimeRoot 'source-root.txt'
 
     function Test-ReloadSource {
@@ -91,12 +91,12 @@ function global:reload {
     # Ricarica anche reload stesso, così eventuali aggiornamenti al bootstrap
     # diventano attivi immediatamente nella sessione corrente.
     . $newBootstrap
-    Write-Host '[OK] PowerShellCustomization ricaricato.' -ForegroundColor Green
+    Write-Host '[OK] PowerShellCustomizationPublic ricaricato.' -ForegroundColor Green
 }
 
 if (Test-Path -LiteralPath $modulePath -PathType Leaf) {
     Import-Module -Name $modulePath -Force -Global
 }
 else {
-    Write-Warning "Modulo PowerShellCustomization non trovato: $modulePath"
+    Write-Warning "Modulo PowerShellCustomizationPublic non trovato: $modulePath"
 }
