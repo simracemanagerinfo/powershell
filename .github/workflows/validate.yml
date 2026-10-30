@@ -32,6 +32,10 @@ jobs:
             [void](Get-Content -LiteralPath $file.FullName -Raw | ConvertFrom-Json)
           }
 
+          $installer = Get-Content install-core.ps1 -Raw
+          if ($installer -notmatch 'PowerShell Customization Public') {
+            throw 'Collegamenti menu Start del repository pubblico non isolati.'
+          }
           $template = Get-Content windows-terminal/managed-settings.json -Raw | ConvertFrom-Json
           $expected = @('Matrix Neon','Cyber Glass','Neon Dev','Stern HUD','Claude Code')
           if (@($template.profiles).Count -ne 5 -or @($template.schemes).Count -ne 5) { throw 'Attesi cinque profili e cinque schemi' }
