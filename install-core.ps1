@@ -506,7 +506,7 @@ function Install-LauncherShortcuts {
     param([Parameter(Mandatory)][string[]]$Names)
 
     $startMenuRoot = if ([string]::IsNullOrWhiteSpace($StartMenuRootOverride)) {
-        Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\PowerShell Customization'
+        Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\PowerShell Customization Public'
     }
     else { [IO.Path]::GetFullPath($StartMenuRootOverride) }
     New-Item -ItemType Directory -Path $startMenuRoot -Force | Out-Null
