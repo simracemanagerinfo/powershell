@@ -239,7 +239,7 @@ if (-not (Test-Path -LiteralPath $corePath -PathType Leaf)) {
     throw "Installer core mancante: $corePath"
 }
 
-if (-not $SkipDependencies) {
+if (-not $SkipDependencies -and -not (Resolve-BootstrapCommand -Name 'wt.exe')) {
     $winget = Get-WinGetPath
     Ensure-WindowsTerminalBootstrap -WingetPath $winget | Out-Null
 }
