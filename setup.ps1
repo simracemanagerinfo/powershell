@@ -1,20 +1,21 @@
 [CmdletBinding()]
 param(
     [switch]$SkipDependencies,
-    [switch]$Reconfigure
+    [switch]$Reconfigure,
+    [ValidateSet('Matrix GPT','Cyber Glass','Neon Dev','Stern HUD','Claude Code')]
+    [string[]]$AddLauncher
 )
 
 $ErrorActionPreference = 'Stop'
 
 $installScript = Join-Path $PSScriptRoot 'install.ps1'
-$refreshScript = Join-Path $PSScriptRoot 'refresh.ps1'
 
 $installArgs = @{}
 if ($SkipDependencies) { $installArgs.SkipDependencies = $true }
 if ($Reconfigure) { $installArgs.Reconfigure = $true }
+if ($AddLauncher) { $installArgs.AddLauncher = $AddLauncher }
 
 & $installScript @installArgs
-& $refreshScript
 
 Write-Host ''
 Write-Host 'Setup completato.' -ForegroundColor Green
