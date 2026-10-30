@@ -7,8 +7,8 @@ param(
     [string]$AssetRoot,
 
     [Parameter()]
-    [ValidateSet('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD')]
-    [string[]]$Launchers = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD'),
+    [ValidateSet('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code')]
+    [string[]]$Launchers = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code'),
 
     [Parameter(DontShow)]
     [switch]$ForcePortableToolchain
@@ -19,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 $llvmVersion = '20260616'
 $llvmFolderName = "llvm-mingw-$llvmVersion-ucrt-x86_64"
 $llvmUrl = "https://github.com/mstorsjo/llvm-mingw/releases/download/$llvmVersion/$llvmFolderName.zip"
-$toolCacheRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomization\build-tools'
+$toolCacheRoot = Join-Path $env:LOCALAPPDATA 'PowerShellCustomizationPublic\build-tools'
 $llvmRoot = Join-Path $toolCacheRoot $llvmFolderName
 
 function Get-ExistingGnuToolchain {
@@ -106,8 +106,9 @@ function New-ResourceScript {
 $launcherDefinitions = @(
     @{ Name = 'Matrix GPT'; Source = 'Matrix GPT.c'; Icon = 'matrix_gpt.ico' },
     @{ Name = 'Cyber Glass'; Source = 'Cyber Glass.c'; Icon = 'matrix_gpt_clear.ico' },
-    @{ Name = 'Neon Dev'; Source = 'Neon Dev.c'; Icon = 'svi_gpt.ico' },
-    @{ Name = 'Stern HUD'; Source = 'Stern HUD.c'; Icon = 'stern_logs.ico' }
+    @{ Name = 'Neon Dev'; Source = 'Neon Dev.c'; Icon = 'svi_gpt_original.ico' },
+    @{ Name = 'Stern HUD'; Source = 'Stern HUD.c'; Icon = 'stern_logs.ico' },
+    @{ Name = 'Claude Code'; Source = 'Claude Code.c'; Icon = 'matrix_gpt_clear.ico' }
 )
 
 $manifestPath = Join-Path $PSScriptRoot 'launcher.manifest'
@@ -120,21 +121,17 @@ if ($selectedDefinitions.Count -eq 0) {
 }
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-foreach ($definition in $launcherDefinitions) {
-    $previousOutput = Join-Path $OutputDirectory "$($definition.Name).exe"
-    if (Test-Path -LiteralPath $previousOutput -PathType Leaf) {
-        Remove-Item -LiteralPath $previousOutput -Force
-    }
-}
+# Compila in staging: non cancellare i launcher funzionanti prima del successo della build.
 $tempRoot = Join-Path $env:TEMP "powershell-customization-launchers-$([Guid]::NewGuid().ToString('N'))"
-New-Item -ItemType Directory -Path $tempRoot -Force | Out-Null
+$stagingOutput = Join-Path $tempRoot 'built'
+New-Item -ItemType Directory -Path $stagingOutput -Force | Out-Null
 
 Push-Location $PSScriptRoot
 try {
     foreach ($launcher in $selectedDefinitions) {
         $source = Join-Path $PSScriptRoot $launcher.Source
         $icon = Join-Path $iconRoot $launcher.Icon
-        $executable = Join-Path $OutputDirectory "$($launcher.Name).exe"
+        $executable = Join-Path $stagingOutput "$($launcher.Name).exe"
         $resourceRc = Join-Path $tempRoot "$($launcher.Name).rc"
 
         if (-not (Test-Path -LiteralPath $icon -PathType Leaf)) {
@@ -181,7 +178,24 @@ try {
             throw "Build completata senza produrre $executable"
         }
 
-        Write-Host "[BUILT] $executable" -ForegroundColor Green
+        Write-Host "[COMPILED] $executable" -ForegroundColor DarkGray
+    }
+
+    # Pubblica soltanto dopo la compilazione e la verifica di TUTTI gli EXE selezionati.
+    foreach ($launcher in $selectedDefinitions) {
+        $compiled = Join-Path $stagingOutput "$($launcher.Name).exe"
+        $destination = Join-Path $OutputDirectory "$($launcher.Name).exe"
+        Copy-Item -LiteralPath $compiled -Destination $destination -Force
+        Write-Host "[BUILT] $destination" -ForegroundColor Green
+    }
+
+    # Pulizia della selezione esplicita soltanto dopo la pubblicazione riuscita.
+    foreach ($definition in $launcherDefinitions) {
+        if ($definition.Name -in $Launchers) { continue }
+        $obsolete = Join-Path $OutputDirectory "$($definition.Name).exe"
+        if (Test-Path -LiteralPath $obsolete -PathType Leaf) {
+            Remove-Item -LiteralPath $obsolete -Force
+        }
     }
 }
 finally {
@@ -189,7 +203,8 @@ finally {
     Remove-Item -LiteralPath $tempRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-$built = @(Get-ChildItem -LiteralPath $OutputDirectory -File -Filter '*.exe' | Sort-Object Name)
+$built = @(Get-ChildItem -LiteralPath $OutputDirectory -File -Filter '*.exe' |
+    Where-Object { $_.BaseName -in $Launchers } | Sort-Object Name)
 if ($built.Count -ne $selectedDefinitions.Count) {
     throw "Build incompleta: attesi $($selectedDefinitions.Count) EXE, trovati $($built.Count)."
 }
