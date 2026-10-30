@@ -5,7 +5,7 @@ $configPath = if ($env:POWERSHELL_OPENSHIFT_CONFIG) {
     $env:POWERSHELL_OPENSHIFT_CONFIG
 }
 elseif ($env:LOCALAPPDATA) {
-    Join-Path $env:LOCALAPPDATA 'PowerShellCustomization\openshift.local.json'
+    Join-Path $env:LOCALAPPDATA 'PowerShellCustomizationPublic\openshift.local.json'
 }
 else {
     $configHome = if ($env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME } else { Join-Path $HOME '.config' }
