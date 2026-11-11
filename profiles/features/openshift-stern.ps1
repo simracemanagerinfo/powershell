@@ -39,6 +39,32 @@ function loginoc {
     }
 
     & oc login --web $url
+    $loginExitCode = $LASTEXITCODE
+    if ($loginExitCode -eq 0 -and $config.PSObject.Properties['defaultProject']) {
+        $defaultProject = [string]$config.defaultProject
+        if (-not [string]::IsNullOrWhiteSpace($defaultProject)) {
+            & oc project $defaultProject.Trim()
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Login riuscito, ma il progetto predefinito '$defaultProject' non è accessibile."
+            }
+        }
+    }
+}
+
+function prj {
+    param([string]$Project)
+
+    if ([string]::IsNullOrWhiteSpace($Project)) {
+        & oc project
+        return
+    }
+    & oc project $Project.Trim()
+}
+
+if ($AliasDescriptions) {
+    $AliasDescriptions['prj'] = 'Mostra o cambia il progetto OpenShift corrente'
+    $AliasDescriptions['loginoc'] = 'Accede a un cluster OpenShift configurato localmente'
+    $AliasDescriptions['sternLog'] = 'Mostra i log Stern di un servizio configurato localmente'
 }
 
 function sternLog {

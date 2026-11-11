@@ -2,7 +2,7 @@
 param(
     [switch]$SkipDependencies,
     [switch]$Reconfigure,
-    [ValidateSet('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code')]
+    [ValidateSet('Matrix GPT', 'Cyber Glass', 'Cyber 2.0', 'Neon Dev', 'Stern HUD', 'Claude Code')]
     [string[]]$AddLauncher,
 
     [Parameter(DontShow)]
@@ -54,7 +54,7 @@ else { [IO.Path]::GetFullPath($FragmentRootOverride) }
 $script:OptionsPath = Join-Path $script:RuntimeRoot 'install-options.json'
 $script:BinRoot = Join-Path $script:RuntimeRoot 'bin'
 $script:Timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$script:LauncherNames = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code')
+$script:LauncherNames = @('Matrix GPT', 'Cyber Glass', 'Cyber 2.0', 'Neon Dev', 'Stern HUD', 'Claude Code')
 
 function Read-YesNo {
     param(
@@ -459,8 +459,8 @@ function Install-WindowsTerminalFragment {
     $assetJson = $script:AssetRoot.Replace('\', '\\')
     $rendered = $template.Replace('{{RUNTIME_ROOT}}', $rootJson).Replace('{{ASSET_ROOT}}', $assetJson)
     $validated = $rendered | ConvertFrom-Json -ErrorAction Stop
-    if (@($validated.profiles).Count -ne 5 -or @($validated.schemes).Count -ne 5) {
-        throw 'Fragment Windows Terminal incompleto (attesi 5 profili e 5 schemi).'
+    if (@($validated.profiles).Count -ne 6 -or @($validated.schemes).Count -ne 6) {
+        throw 'Fragment Windows Terminal incompleto (attesi 6 profili e 6 schemi).'
     }
 
     $json = ($validated | ConvertTo-Json -Depth 100) + [Environment]::NewLine

@@ -37,9 +37,9 @@ jobs:
             throw 'Collegamenti menu Start del repository pubblico non isolati.'
           }
           $template = Get-Content windows-terminal/managed-settings.json -Raw | ConvertFrom-Json
-          $expected = @('Matrix Neon','Cyber Glass','Neon Dev','Stern HUD','Claude Code')
-          if (@($template.profiles).Count -ne 5 -or @($template.schemes).Count -ne 5) { throw 'Attesi cinque profili e cinque schemi' }
-          if (@($template.profiles | ForEach-Object guid | Select-Object -Unique).Count -ne 5) { throw 'GUID duplicati' }
+          $expected = @('Matrix Neon','Cyber Glass','Cyber 2.0','Neon Dev','Stern HUD','Claude Code')
+          if (@($template.profiles).Count -ne 6 -or @($template.schemes).Count -ne 6) { throw 'Attesi sei profili e sei schemi' }
+          if (@($template.profiles | ForEach-Object guid | Select-Object -Unique).Count -ne 6) { throw 'GUID duplicati' }
           foreach ($terminalProfile in $template.profiles) {
             if ($terminalProfile.name -notin $expected) { throw "Profilo sconosciuto $($terminalProfile.name)" }
             if ($terminalProfile.commandline -notmatch 'pwsh\.exe -NoLogo') { throw "Il profilo $($terminalProfile.name) non usa PowerShell 7" }
@@ -50,7 +50,7 @@ jobs:
               }
             }
           }
-          foreach ($required in @('cybergpt/Select-ClaudeProject.ps1','cybergpt/themes/claude_code.omp.json',
+          foreach ($required in @('cybergpt/Select-ClaudeProject.ps1','cybergpt/themes/claude_code.omp.json','cybergpt/themes/cyber_2_0_gpt.omp.json','cybergpt/shaders/cyber_2_0_hud.hlsl',
                                    'commands/claude-code.ps1','launchers/src/Claude Code.c',
                                    'assets/icons/svi_gpt_original.ico')) {
             if (-not (Test-Path -LiteralPath $required -PathType Leaf)) { throw "Manca $required" }
@@ -117,8 +117,8 @@ jobs:
           $fragmentFile = Join-Path $fragment 'powershell-customization-public.json'
           if (-not (Test-Path $fragmentFile)) { throw 'Fragment pubblico mancante.' }
           $json = Get-Content $fragmentFile -Raw | ConvertFrom-Json
-          if (@($json.profiles).Count -ne 5) { throw 'Numero profili del fragment inatteso.' }
-          foreach ($launcher in @('Matrix GPT','Cyber Glass','Neon Dev','Stern HUD','Claude Code')) {
+          if (@($json.profiles).Count -ne 6) { throw 'Numero profili del fragment inatteso.' }
+          foreach ($launcher in @('Matrix GPT','Cyber Glass','Cyber 2.0','Neon Dev','Stern HUD','Claude Code')) {
             if (-not (Test-Path -LiteralPath (Join-Path $runtime "launchers/$launcher.exe") -PathType Leaf)) {
               throw "Launcher mancante: $launcher"
             }

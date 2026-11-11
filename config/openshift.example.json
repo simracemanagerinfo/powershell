@@ -1,4 +1,5 @@
 {
+  "defaultProject": "example",
   "clusters": {
     "test": "https://api.example-test.local:6443",
     "prod": "https://api.example-prod.local:6443"

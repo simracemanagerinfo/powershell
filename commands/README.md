@@ -26,6 +26,10 @@ reload
 mio-comando
 ```
 
+## Comandi condivisi
+
+- `bv`: aggiorna le versioni di `pom.xml` e YAML quando viene invocato. Non modifica nulla al caricamento della shell.
+
 ## Contratto di un command
 
 Un command deve limitarsi a **registrare** funzioni, alias e metadati quando viene caricato. Non deve eseguire automaticamente operazioni applicative, login, chiamate remote o modifiche al sistema durante il caricamento del profilo.
@@ -68,7 +72,7 @@ Dopo aver copiato i file nei rispettivi path basta:
 reload
 ```
 
-`refresh.ps1` copia automaticamente i file presenti in `commands/` e `scripts/` nel runtime sotto `%LOCALAPPDATA%\PowerShellCustomization`.
+`refresh.ps1` copia automaticamente i file presenti in `commands/` e `scripts/` nel runtime sotto `%LOCALAPPDATA%\PowerShellCustomizationPublic`.
 
 ## Rimuovere un command
 

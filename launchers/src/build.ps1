@@ -7,8 +7,8 @@ param(
     [string]$AssetRoot,
 
     [Parameter()]
-    [ValidateSet('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code')]
-    [string[]]$Launchers = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code'),
+    [ValidateSet('Matrix GPT', 'Cyber Glass', 'Cyber 2.0', 'Neon Dev', 'Stern HUD', 'Claude Code')]
+    [string[]]$Launchers = @('Matrix GPT', 'Cyber Glass', 'Cyber 2.0', 'Neon Dev', 'Stern HUD', 'Claude Code'),
 
     [Parameter(DontShow)]
     [switch]$ForcePortableToolchain
@@ -106,6 +106,7 @@ function New-ResourceScript {
 $launcherDefinitions = @(
     @{ Name = 'Matrix GPT'; Source = 'Matrix GPT.c'; Icon = 'matrix_gpt.ico' },
     @{ Name = 'Cyber Glass'; Source = 'Cyber Glass.c'; Icon = 'matrix_gpt_clear.ico' },
+    @{ Name = 'Cyber 2.0'; Source = 'Cyber 2.0.c'; Icon = 'matrix_gpt_clear.ico' },
     @{ Name = 'Neon Dev'; Source = 'Neon Dev.c'; Icon = 'svi_gpt_original.ico' },
     @{ Name = 'Stern HUD'; Source = 'Stern HUD.c'; Icon = 'stern_logs.ico' },
     @{ Name = 'Claude Code'; Source = 'Claude Code.c'; Icon = 'matrix_gpt_clear.ico' }

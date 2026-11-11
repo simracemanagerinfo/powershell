@@ -41,6 +41,33 @@
       "useAcrylic": true
     },
     {
+      "backgroundImage": "{{ASSET_ROOT}}\\backgrounds\\pool\\01_roma_vaticano_neon.png",
+      "backgroundImageAlignment": "center",
+      "backgroundImageOpacity": 0.35,
+      "backgroundImageStretchMode": "uniformToFill",
+      "colorScheme": "cyber_2_0_gpt",
+      "commandline": "pwsh.exe -NoLogo -NoExit -NoProfile -File \"{{RUNTIME_ROOT}}\\Start-CyberProfile.ps1\" -Theme cyber_2_0_gpt",
+      "cursorShape": "bar",
+      "experimental.pixelShaderPath": "{{RUNTIME_ROOT}}\\shaders\\cyber_2_0_hud.hlsl",
+      "font": {
+        "face": "MesloLGM Nerd Font",
+        "size": 9
+      },
+      "guid": "{eb5c5fe4-d67f-48dd-a82d-022830817106}",
+      "hidden": false,
+      "icon": "{{ASSET_ROOT}}\\icons\\matrix_gpt_clear.ico",
+      "intenseTextStyle": "bold",
+      "name": "Cyber 2.0",
+      "opacity": 98,
+      "padding": "104, 48, 104, 40",
+      "tabColor": "#00D9FF",
+      "unfocusedAppearance": {
+        "backgroundImageOpacity": 0.25,
+        "opacity": 92
+      },
+      "useAcrylic": false
+    },
+    {
       "name": "Neon Dev",
       "guid": "{eb5c5fe4-d67f-48dd-a82d-022830817103}",
       "commandline": "pwsh.exe -NoLogo -NoExit -NoProfile -File \"{{RUNTIME_ROOT}}\\Start-CyberProfile.ps1\" -Theme neon_dev_gpt",
@@ -153,6 +180,29 @@
       "brightPurple": "#D5A6FF",
       "brightCyan": "#A1FFE0",
       "brightWhite": "#FFFFFF"
+    },
+    {
+      "name": "cyber_2_0_gpt",
+      "background": "#020713",
+      "foreground": "#D8F8FF",
+      "cursorColor": "#00E5FF",
+      "selectionBackground": "#123A52",
+      "black": "#01040B",
+      "red": "#FF5277",
+      "green": "#48F7B2",
+      "yellow": "#FFD166",
+      "blue": "#188BFF",
+      "purple": "#C084FC",
+      "cyan": "#00D9FF",
+      "white": "#C9F5FF",
+      "brightBlack": "#3D5C68",
+      "brightRed": "#FF7995",
+      "brightGreen": "#78FFD0",
+      "brightYellow": "#FFE09A",
+      "brightBlue": "#58B7FF",
+      "brightPurple": "#E06BFF",
+      "brightCyan": "#70F3FF",
+      "brightWhite": "#F4FDFF"
     },
     {
       "name": "neon_dev_gpt",

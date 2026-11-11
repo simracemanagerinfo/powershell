@@ -3,7 +3,7 @@ param(
     [switch]$SkipDependencies,
     [switch]$Reconfigure,
 
-    [ValidateSet('Matrix GPT','Cyber Glass','Neon Dev','Stern HUD','Claude Code')]
+    [ValidateSet('Matrix GPT','Cyber Glass', 'Cyber 2.0', 'Neon Dev','Stern HUD','Claude Code')]
     [string[]]$AddLauncher,
 
     [Parameter(DontShow)]

@@ -20,7 +20,7 @@ else {
     [IO.Path]::GetFullPath($ProfilePathOverride)
 }
 $optionsPath = Join-Path $runtimeRoot 'install-options.json'
-$launcherNames = @('Matrix GPT', 'Cyber Glass', 'Neon Dev', 'Stern HUD', 'Claude Code')
+$launcherNames = @('Matrix GPT', 'Cyber Glass', 'Cyber 2.0', 'Neon Dev', 'Stern HUD', 'Claude Code')
 $selectedLaunchers = @($launcherNames)
 if (Test-Path -LiteralPath $optionsPath -PathType Leaf) {
     try {
@@ -78,13 +78,13 @@ Add-Result -Name 'Windows Terminal fragment' -Status $(if ($fragmentFound) { 'PA
 if ($fragmentFound) {
     try {
         $json = [IO.File]::ReadAllText($fragment) | ConvertFrom-Json -ErrorAction Stop
-        $expectedNames = @('Matrix Neon','Cyber Glass','Neon Dev','Stern HUD','Claude Code')
+        $expectedNames = @('Matrix Neon','Cyber Glass','Cyber 2.0','Neon Dev','Stern HUD','Claude Code')
         $profiles = @($json.profiles | Where-Object { $_.name -in $expectedNames })
         $ids = @($profiles | ForEach-Object { [string]$_.guid } | Select-Object -Unique)
         $schemes = @($json.schemes | ForEach-Object { [string]$_.name })
-        $valid = $profiles.Count -eq 5 -and $ids.Count -eq 5 -and
-            @($json.schemes).Count -eq 5 -and 'claude_code_neon' -in $schemes
-        Add-Result -Name 'Profili grafici Windows Terminal' -Status $(if ($valid) { 'PASS' } else { 'FAIL' }) -Details "Profili: $($profiles.Count)/5"
+        $valid = $profiles.Count -eq 6 -and $ids.Count -eq 6 -and
+            @($json.schemes).Count -eq 6 -and 'claude_code_neon' -in $schemes
+        Add-Result -Name 'Profili grafici Windows Terminal' -Status $(if ($valid) { 'PASS' } else { 'FAIL' }) -Details "Profili: $($profiles.Count)/6"
     }
     catch {
         Add-Result -Name 'Profili grafici Windows Terminal' -Status 'FAIL' -Details $_.Exception.Message
@@ -96,7 +96,7 @@ else {
 $selectorPath = Join-Path $terminalRuntimeRoot 'Select-ClaudeProject.ps1'
 Add-Result -Name 'Selettore progetti Claude' -Status $(if (Test-Path -LiteralPath $selectorPath -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $selectorPath
 
-foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'neon_glow.hlsl')) {
+foreach ($shader in @('matrix_rain.hlsl', 'cyber_glass_hud.hlsl', 'cyber_2_0_hud.hlsl', 'neon_glow.hlsl')) {
     $path = Join-Path $terminalRuntimeRoot "shaders\$shader"
     Add-Result -Name "Shader $shader" -Status $(if (Test-Path -LiteralPath $path -PathType Leaf) { 'PASS' } else { 'FAIL' }) -Details $path
 }

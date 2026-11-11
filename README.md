@@ -14,18 +14,19 @@ cd powershell
 
 In alternativa puoi scaricare lo ZIP del repository da GitHub, estrarlo e lanciare `setup.ps1` dalla cartella estratta. Per scaricare aggiornamenti futuri sarà però preferibile il clone Git.
 
-**Il primo setup non richiede domande:** seleziona tutte le cinque grafiche e lascia OpenShift/Stern disattivato. In automatico prova a installare ciò che manca: PowerShell 7, Windows Terminal, Oh My Posh, moduli PSReadLine/Terminal-Icons, font Meslo Nerd Font e compilatore portable per i launcher (quando GCC non è disponibile). Il codice usa `winget`/PSGallery e tenta operazioni in ambito **CurrentUser**, senza chiedere elevazione.
+**Il primo setup non richiede domande:** seleziona tutte le sei grafiche e lascia OpenShift/Stern disattivato. In automatico prova a installare ciò che manca: PowerShell 7, Windows Terminal, Oh My Posh, moduli PSReadLine/Terminal-Icons, font Meslo Nerd Font e compilatore portable per i launcher (quando GCC non è disponibile). Il codice usa `winget`/PSGallery e tenta operazioni in ambito **CurrentUser**, senza chiedere elevazione.
 
 **Limiti aziendali:** Git (per il clone), WinGet/Microsoft App Installer e l'accesso alle fonti degli strumenti sono prerequisiti esterni. Policy aziendali, proxy, antivirus o restrizioni su MSIX/font/script possono impedire l'installazione senza diritti o intervento IT. In quel caso lo script deve segnalare l'errore, non aggirare le restrizioni. Con `-SkipDependencies` si installano soltanto componenti già disponibili, utile per chi prepara l'ambiente in modo gestito.
 
 Al termine, **chiudi tutte le finestre di Windows Terminal e riaprilo**: finché rimane un processo attivo può continuare a usare i profili precedenti. Se necessario, da un prompt esterno a Windows Terminal si può chiudere con `taskkill /F /IM WindowsTerminal.exe` **dopo aver salvato il lavoro nelle sessioni aperte**.
 
-## I cinque launcher
+## I sei launcher
 
 Dal menu Start, sotto **PowerShell Customization Public**, puoi aprire:
 
 - **Matrix GPT.exe** — Matrix Neon, verde;
 - **Cyber Glass.exe** — sfondi a rotazione, trasparenze;
+- **Cyber 2.0.exe** — tema neon con shader HUD dedicato; lo sfondo usa per ora un'immagine già inclusa nel repository pubblico;
 - **Neon Dev.exe** — effetto neon per lo sviluppo;
 - **Stern HUD.exe** — grafica log, utilizzabile anche senza OpenShift/Stern CLI;
 - **Claude Code.exe** — palette terracotta e crema, selettore dei progetti e avvio di Claude CLI.
@@ -74,10 +75,10 @@ git pull --ff-only
 
 `setup.ps1` è eseguibile più volte: aggiorna i file solo se cambiati e riusa launcher già compilati quando il sorgente non è cambiato. Per riconfigurare la scelta dei launcher oppure attivare OpenShift/Stern, esegui `setup.ps1 -Reconfigure`.
 
-Per aggiungere soltanto il launcher Claude Code alle preferenze salvate:
+Per aggiungere un singolo launcher alle preferenze salvate (ad esempio Cyber 2.0):
 
 ```powershell
-.\setup.ps1 -AddLauncher 'Claude Code'
+.\setup.ps1 -AddLauncher 'Cyber 2.0'
 ```
 
 Per sincronizzare e ricaricare soltanto i command PowerShell, usa `reload` nella shell già aperta. **`reload` non rigenera i profili di Windows Terminal**: usa `setup.ps1` per temi, shader, asset e launcher. Il comando `reload` usa `source-root.txt` nel runtime pubblico per trovare il repository installato.
